@@ -117,9 +117,9 @@
     <script>
         (function() {
             // ---------- CONFIGURACIÓN ----------
-            const MAX_IMAGES = 20;               // Intentará cargar desde 1.webp hasta 20.webp
+            const MAX_IMAGES = 20;               // Intentará cargar desde 1.jpeg hasta 20.jpeg
             const AUTOPLAY_INTERVAL = 5000;      // 5 segundos
-            const SWIPE_THRESHOLD = 0.2;         // 20% del ancho para cambiar de imagen
+            const SWIPE_THRESHOLD = 0.2;         // 20% del ancho para cambiar de imagen (usado internamente en la lógica)
 
             // ---------- ELEMENTOS DEL DOM ----------
             const track = document.getElementById('galleryTrack');
@@ -139,20 +139,20 @@
 
             // ---------- FUNCIONES AUXILIARES ----------
 
-            /** Carga dinámica de imágenes desde img/1.webp, img/2.webp, etc. */
+            /** Carga dinámica de imágenes desde img/1.jpeg, img/2.jpeg, etc. */
             async function loadImages() {
                 const promises = [];
                 for (let i = 1; i <= MAX_IMAGES; i++) {
-                    const url = `img/${i}.webp`;
+                    const url = `img/${i}.jpeg`;   // <-- Cambiado a .jpeg
                     promises.push(new Promise((resolve) => {
                         const img = new Image();
                         img.onload = () => resolve(url);
-                        img.onerror = () => resolve(null); // Resolvemos con null para filtrar después
+                        img.onerror = () => resolve(null); // Si no existe, se ignora
                         img.src = url;
                     }));
                 }
                 const results = await Promise.all(promises);
-                // Filtramos las que se cargaron correctamente
+                // Filtramos solo las que se cargaron correctamente
                 return results.filter(url => url !== null);
             }
 
@@ -182,7 +182,7 @@
                     slide.style.fontSize = '1.5rem';
                     slide.textContent = 'No hay imágenes disponibles';
                     track.appendChild(slide);
-                    originalCount = 1; // Para evitar errores
+                    originalCount = 1; // Para evitar errores en otras funciones
                     slides = [slide];
                     currentIndex = 0;
                     return;
