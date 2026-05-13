@@ -11,8 +11,9 @@
             box-sizing: border-box;
         }
 
+        /* Fondo inicial (por si JS tarda o falla) */
         body {
-            background-image: url('recursos/fondo.jpeg');
+            background-color: #222;           /* Respaldo oscuro */
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -102,58 +103,64 @@
     <script>
         (function() {
             // ---------- CONFIGURACIÓN ----------
-            var MAX_IMAGES = 20;                // Intenta cargar desde 1.jpeg hasta 20.jpeg
-            var AUTOPLAY_INTERVAL = 5000;       // 5 segundos
-            var TRANSITION_DURATION = 300;      // Debe coincidir con CSS (0.3s = 300ms)
+            var MAX_IMAGES = 20;
+            var AUTOPLAY_INTERVAL = 5000;
+            var TRANSITION_DURATION = 300;
 
-            // ---------- ELEMENTOS DEL DOM ----------
             var track = document.getElementById('galleryTrack');
             var container = document.getElementById('galleryContainer');
+            var body = document.body;
 
-            // ---------- VARIABLES DE ESTADO ----------
-            var originalImages = [];            // URLs válidas
+            var originalImages = [];
             var originalCount = 0;
-            var slides = [];                    // Elementos slide (con clones)
-            var currentIndex = 0;               // Índice en el array extendido
+            var slides = [];
+            var currentIndex = 0;
             var autoTimer = null;
             var isDragging = false;
             var isTransitioning = false;
             var startPosX = 0;
-            var startOffset = 0;                // Pixeles al iniciar arrastre
+            var startOffset = 0;
+            var lastMoveX;
 
-            // ---------- FUNCIONES AUXILIARES ----------
+            // ---------- CARGA DEL FONDO POR JS (¡NUEVO!) ----------
+            function loadBackground() {
+                var bgImg = new Image();
+                bgImg.onload = function() {
+                    // Éxito: aplicamos la imagen de fondo directamente al body
+                    body.style.backgroundImage = "url('recursos/fondo.jpeg')";
+                };
+                bgImg.onerror = function() {
+                    // Fallo: dejamos el color de respaldo que ya tiene el CSS
+                    // Opcional: puedes cambiar el color aquí, por ejemplo #111
+                    body.style.backgroundColor = '#111';
+                };
+                bgImg.src = 'recursos/fondo.jpeg';
+            }
 
-            /** Carga dinámica de imágenes (compatible sin promesas) */
+            // ---------- CARGA DE IMÁGENES DE LA GALERÍA ----------
             function loadImages(callback) {
                 var validUrls = [];
-                var checkedCount = 0;
                 var totalToCheck = MAX_IMAGES;
 
                 function checkOne(index) {
                     if (index > totalToCheck) {
-                        // Todas revisadas
                         callback(validUrls);
                         return;
                     }
-
                     var url = 'img/' + index + '.jpeg';
                     var img = new Image();
                     img.onload = function() {
                         validUrls.push(url);
-                        checkedCount++;
                         checkOne(index + 1);
                     };
                     img.onerror = function() {
-                        checkedCount++;
                         checkOne(index + 1);
                     };
                     img.src = url;
                 }
-
                 checkOne(1);
             }
 
-            /** Crea un elemento slide con la imagen */
             function createSlide(imageUrl) {
                 var slideDiv = document.createElement('div');
                 slideDiv.className = 'slide';
@@ -165,7 +172,6 @@
                 return slideDiv;
             }
 
-            /** Construye la galería con clones para bucle infinito */
             function buildGallery(images) {
                 track.innerHTML = '';
                 originalImages = images;
@@ -185,37 +191,28 @@
                 }
 
                 var fragment = document.createDocumentFragment();
-
                 if (originalCount > 1) {
-                    // Clon del último al principio
                     fragment.appendChild(createSlide(images[originalCount - 1]));
                 }
-
-                // Originales
                 for (var i = 0; i < originalCount; i++) {
                     fragment.appendChild(createSlide(images[i]));
                 }
-
                 if (originalCount > 1) {
-                    // Clon de la primera al final
                     fragment.appendChild(createSlide(images[0]));
                 }
 
                 track.appendChild(fragment);
                 slides = Array.prototype.slice.call(track.children);
-
                 currentIndex = originalCount > 1 ? 1 : 0;
                 updateTransform(false);
             }
 
-            /** Actualiza la propiedad transform del track */
             function updateTransform(withTransition) {
                 if (withTransition === undefined) withTransition = true;
                 track.style.transition = withTransition ? 'transform ' + (TRANSITION_DURATION / 1000) + 's ease' : 'none';
                 track.style.transform = 'translateX(-' + (currentIndex * 100) + '%)';
             }
 
-            /** Reinicia el temporizador de autoavance */
             function resetAutoTimer() {
                 clearInterval(autoTimer);
                 if (originalCount > 1) {
@@ -223,22 +220,17 @@
                 }
             }
 
-            /** Avanza automáticamente */
             function autoNext() {
                 if (isDragging || isTransitioning || originalCount <= 1) return;
                 isTransitioning = true;
                 currentIndex++;
                 updateTransform(true);
-
-                // Usamos setTimeout en lugar de transitionend para máxima compatibilidad
                 setTimeout(handleTransitionEnd, TRANSITION_DURATION + 50);
             }
 
-            /** Reposiciona los clones cuando se llega a un extremo */
             function handleTransitionEnd() {
                 isTransitioning = false;
                 if (originalCount <= 1) return;
-
                 if (currentIndex === 0) {
                     currentIndex = originalCount;
                     updateTransform(false);
@@ -248,61 +240,49 @@
                 }
             }
 
-            /** Obtiene el desplazamiento actual a partir del índice (evita DOMMatrix) */
             function getCurrentOffset() {
                 return -currentIndex * container.offsetWidth;
             }
 
-            // ---------- EVENTOS DE RATÓN (para PCs y algunos TV con ratón) ----------
+            // ---------- EVENTOS DE RATÓN ----------
             container.addEventListener('mousedown', function(e) {
                 startDrag(e.clientX);
                 e.preventDefault();
             });
-
             window.addEventListener('mousemove', function(e) {
                 if (!isDragging) return;
                 moveDrag(e.clientX);
                 e.preventDefault();
             });
-
             window.addEventListener('mouseup', function(e) {
                 if (!isDragging) return;
                 endDrag(e.clientX);
                 e.preventDefault();
             });
 
-            // ---------- EVENTOS TÁCTILES (para pantallas táctiles de TV) ----------
+            // ---------- EVENTOS TÁCTILES ----------
             container.addEventListener('touchstart', function(e) {
                 if (e.touches.length === 1) {
                     startDrag(e.touches[0].clientX);
                     e.preventDefault();
                 }
             });
-
             container.addEventListener('touchmove', function(e) {
                 if (!isDragging) return;
                 moveDrag(e.touches[0].clientX);
                 e.preventDefault();
             });
-
             container.addEventListener('touchend', function(e) {
                 if (!isDragging) return;
-                // En touchend no hay clientX, usamos la última posición conocida
                 endDrag(lastMoveX !== undefined ? lastMoveX : startPosX);
                 e.preventDefault();
             });
 
-            // Variable auxiliar para guardar la última X durante touchmove
-            var lastMoveX = undefined;
-
-            // Funciones comunes de arrastre
             function startDrag(clientX) {
                 if (originalCount <= 1) return;
                 clearInterval(autoTimer);
                 isDragging = true;
                 lastMoveX = clientX;
-
-                // Detener transición en curso
                 track.style.transition = 'none';
                 startOffset = getCurrentOffset();
                 startPosX = clientX;
@@ -325,7 +305,6 @@
                 var endOffset = startOffset + diffX;
                 var containerWidth = container.offsetWidth;
 
-                // Índice más cercano
                 var targetIndex = Math.round(-endOffset / containerWidth);
                 targetIndex = Math.max(0, Math.min(targetIndex, slides.length - 1));
 
@@ -333,13 +312,15 @@
                 currentIndex = targetIndex;
                 updateTransform(true);
 
-                // Programar el fin de la transición
                 setTimeout(handleTransitionEnd, TRANSITION_DURATION + 50);
-
                 resetAutoTimer();
             }
 
             // ---------- INICIALIZACIÓN ----------
+            // 1. Cargar fondo con JS
+            loadBackground();
+
+            // 2. Cargar galería normalmente
             loadImages(function(images) {
                 buildGallery(images);
                 if (originalCount > 1) {
