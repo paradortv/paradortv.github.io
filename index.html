@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Galería de productos</title>
+    <style>
+        /* Reset y configuración general */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Fondo de pantalla completo, sin scroll */
+        body {
+            background-image: url('recursos/fondo.jpeg');
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            height: 100vh;
+            overflow: hidden;            /* Elimina cualquier scroll */
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        /* Capa oscura para mejorar contraste */
+        .overlay {
+            width: 100%;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.55);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Contenedor principal: columna que ocupa todo el alto */
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            max-width: 900px;
+            height: 100%;
+        }
+
+        /* Contenedor de la galería (zona deslizable) */
+        .gallery-container {
+            flex: 1;
+            min-height: 0;               /* Necesario para que flex no desborde */
+            overflow: hidden;
+            touch-action: none;          /* Desactiva el scroll nativo en táctiles */
+            position: relative;
+            border-radius: 12px;
+            background-color: rgba(0, 0, 0, 0.3);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            user-select: none;           /* Evita selección de texto */
+        }
+
+        /* Pista que contiene todas las diapositivas */
+        .gallery-track {
+            display: flex;
+            height: 100%;
+            transition: transform 0.3s ease;
+            will-change: transform;
+        }
+
+        /* Cada diapositiva ocupa el 100% del ancho del contenedor */
+        .slide {
+            flex: 0 0 100%;
+            height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+
+        /* Las imágenes se ajustan sin deformarse */
+        .slide img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            pointer-events: none;        /* Evita que la imagen interfiera con el arrastre */
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Texto inferior */
+        .footer-text {
+            flex-shrink: 0;
+            text-align: center;
+            padding: 15px 0 5px;
+            color: white;
+            font-size: clamp(1.2rem, 3vw, 2rem);
+            font-weight: bold;
+            text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.7);
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay">
+        <div class="main-container">
+            <!-- Galería de imágenes -->
+            <div class="gallery-container" id="galleryContainer">
+                <div class="gallery-track" id="galleryTrack">
+                    <!-- Las diapositivas se generan dinámicamente con JavaScript -->
+                </div>
+            </div>
+            <!-- Texto fijo -->
+            <div class="footer-text">
+                ¡mira nuestros productos!
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ---------- CONFIGURACIÓN ----------
+            const MAX_IMAGES = 20;               // Intentará cargar desde 1.webp hasta 20.webp
+            const AUTOPLAY_INTERVAL = 5000;      // 5 segundos
+            const SWIPE_THRESHOLD = 0.2;         // 20% del ancho para cambiar de imagen
+
+            // ---------- ELEMENTOS DEL DOM ----------
+            const track = document.getElementById('galleryTrack');
+            const container = document.getElementById('galleryContainer');
+
+            // ---------- VARIABLES DE ESTADO ----------
+            let originalImages = [];              // URLs de imágenes válidas
+            let originalCount = 0;
+            let slides = [];                      // Array de elementos slide (con clones)
+            let currentIndex = 0;                 // Índice actual en el array extendido
+            let autoTimer = null;
+            let isDragging = false;
+            let isTransitioning = false;
+            let startPosX = 0;
+            let startOffset = 0;                  // Offset en píxeles al iniciar el arrastre
+            let containerWidth = 0;
+
+            // ---------- FUNCIONES AUXILIARES ----------
+
+            /** Carga dinámica de imágenes desde img/1.webp, img/2.webp, etc. */
+            async function loadImages() {
+                const promises = [];
+                for (let i = 1; i <= MAX_IMAGES; i++) {
+                    const url = `img/${i}.webp`;
+                    promises.push(new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => resolve(url);
+                        img.onerror = () => resolve(null); // Resolvemos con null para filtrar después
+                        img.src = url;
+                    }));
+                }
+                const results = await Promise.all(promises);
+                // Filtramos las que se cargaron correctamente
+                return results.filter(url => url !== null);
+            }
+
+            /** Crea un elemento slide con la imagen */
+            function createSlide(imageUrl) {
+                const slideDiv = document.createElement('div');
+                slideDiv.className = 'slide';
+                const img = document.createElement('img');
+                img.src = imageUrl;
+                img.alt = 'Producto';
+                img.draggable = false;
+                slideDiv.appendChild(img);
+                return slideDiv;
+            }
+
+            /** Construye la galería: añade clones para el bucle infinito */
+            function buildGallery(images) {
+                track.innerHTML = '';
+                originalImages = images;
+                originalCount = images.length;
+
+                if (originalCount === 0) {
+                    // Caso sin imágenes: mostramos un mensaje
+                    const slide = document.createElement('div');
+                    slide.className = 'slide';
+                    slide.style.color = 'white';
+                    slide.style.fontSize = '1.5rem';
+                    slide.textContent = 'No hay imágenes disponibles';
+                    track.appendChild(slide);
+                    originalCount = 1; // Para evitar errores
+                    slides = [slide];
+                    currentIndex = 0;
+                    return;
+                }
+
+                const fragment = document.createDocumentFragment();
+
+                // Si hay más de una imagen, creamos clones para el bucle infinito
+                if (originalCount > 1) {
+                    // Clon del último al principio
+                    fragment.appendChild(createSlide(images[originalCount - 1]));
+                }
+
+                // Diapositivas originales
+                images.forEach(src => fragment.appendChild(createSlide(src)));
+
+                if (originalCount > 1) {
+                    // Clon de la primera al final
+                    fragment.appendChild(createSlide(images[0]));
+                }
+
+                track.appendChild(fragment);
+                slides = Array.from(track.children);
+
+                // Posición inicial: si hay más de una imagen, empezamos en la primera real (índice 1)
+                currentIndex = originalCount > 1 ? 1 : 0;
+                updateTransform(false);
+            }
+
+            /** Actualiza la propiedad transform del track */
+            function updateTransform(withTransition = true) {
+                track.style.transition = withTransition ? 'transform 0.3s ease' : 'none';
+                track.style.transform = `translateX(-${currentIndex * 100}%)`;
+            }
+
+            /** Reinicia el temporizador de autoavance */
+            function resetAutoTimer() {
+                clearInterval(autoTimer);
+                if (originalCount > 1) {
+                    autoTimer = setInterval(autoNext, AUTOPLAY_INTERVAL);
+                }
+            }
+
+            /** Avanza automáticamente a la siguiente imagen */
+            function autoNext() {
+                if (isDragging || isTransitioning || originalCount <= 1) return;
+                isTransitioning = true;
+                currentIndex++;
+                updateTransform(true);
+            }
+
+            /** Gestiona el final de una transición para recolocar clones si es necesario */
+            function handleTransitionEnd() {
+                isTransitioning = false;
+                if (originalCount <= 1) return;
+
+                // Si estamos en el clon del principio (índice 0), saltamos al último real
+                if (currentIndex === 0) {
+                    currentIndex = originalCount;
+                    updateTransform(false);
+                }
+                // Si estamos en el clon del final (último slide), saltamos al primer real
+                else if (currentIndex === slides.length - 1) {
+                    currentIndex = 1;
+                    updateTransform(false);
+                }
+            }
+
+            // ---------- EVENTOS DE INTERACCIÓN (RATÓN Y TÁCTIL) ----------
+
+            container.addEventListener('pointerdown', (e) => {
+                if (originalCount <= 1) return;
+                e.preventDefault();                // Evita comportamientos por defecto
+                clearInterval(autoTimer);          // Pausa el autoavance
+                isDragging = true;
+
+                // Detenemos cualquier transición en curso
+                track.style.transition = 'none';
+
+                // Obtenemos el desplazamiento actual en píxeles
+                const style = window.getComputedStyle(track);
+                const matrix = new DOMMatrixReadOnly(style.transform);
+                startOffset = matrix.m41;
+                containerWidth = container.offsetWidth;
+                startPosX = e.clientX;
+
+                container.setPointerCapture(e.pointerId);
+            });
+
+            container.addEventListener('pointermove', (e) => {
+                if (!isDragging) return;
+                e.preventDefault();
+                const diffX = e.clientX - startPosX;
+                const newOffset = startOffset + diffX;
+                track.style.transform = `translateX(${newOffset}px)`;
+            });
+
+            container.addEventListener('pointerup', (e) => {
+                if (!isDragging) return;
+                isDragging = false;
+                container.releasePointerCapture(e.pointerId);
+
+                const diffX = e.clientX - startPosX;
+                const endOffset = startOffset + diffX;
+                containerWidth = container.offsetWidth;
+
+                // Calculamos el índice más cercano según el desplazamiento final
+                let targetIndex = Math.round(-endOffset / containerWidth);
+                targetIndex = Math.max(0, Math.min(targetIndex, slides.length - 1));
+
+                // Aplicamos la transición hacia el slide objetivo
+                isTransitioning = true;
+                currentIndex = targetIndex;
+                updateTransform(true);
+
+                // Reactivamos el temporizador
+                resetAutoTimer();
+            });
+
+            container.addEventListener('pointercancel', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    // Volvemos al slide actual sin animación
+                    updateTransform(false);
+                    resetAutoTimer();
+                }
+            });
+
+            // Escuchamos el fin de la transición para manejar los clones
+            track.addEventListener('transitionend', handleTransitionEnd);
+
+            // ---------- INICIALIZACIÓN ----------
+            loadImages().then(images => {
+                buildGallery(images);
+                if (originalCount > 1) {
+                    resetAutoTimer();
+                }
+            }).catch(err => {
+                console.error('Error al cargar imágenes:', err);
+                // Fallback por si algo falla
+                buildGallery([]);
+            });
+        })();
+    </script>
+</body>
+</html>
