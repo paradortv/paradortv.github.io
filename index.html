@@ -12,7 +12,7 @@
         }
 
         body {
-            background-color: #2b2b2b;          /* Respaldo oscuro */
+            background-color: #2b2b2b;
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -27,11 +27,11 @@
         .overlay {
             width: 100%;
             height: 100vh;
-            background-color: rgba(20, 15, 10, 0.65);  /* Tono cálido y oscuro */
+            background-color: rgba(20, 15, 10, 0.65);
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 4vw;
+            padding: 2.5vw;               /* Más espacio para la galería */
         }
 
         .main-container {
@@ -44,7 +44,7 @@
 
         /* Galería con marco rústico */
         .gallery-container {
-            flex: 1;
+            flex: 1;                      /* Ocupa todo el espacio disponible */
             min-height: 0;
             overflow: hidden;
             touch-action: none;
@@ -52,11 +52,10 @@
             border-radius: 12px;
             background-color: rgba(0, 0, 0, 0.4);
             box-shadow:
-                0 0 0 3px rgba(180, 140, 100, 0.3),  /* marco externo sutil */
+                0 0 0 3px rgba(180, 140, 100, 0.3),
                 0 20px 40px rgba(0, 0, 0, 0.6),
-                inset 0 0 30px rgba(0, 0, 0, 0.5);   /* sombra interior */
+                inset 0 0 30px rgba(0, 0, 0, 0.5);
             user-select: none;
-            transition: box-shadow 0.3s;
         }
 
         .gallery-track {
@@ -72,37 +71,31 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 15px;
-            background-color: #1a1a1a;  /* Fondo para bandas laterales en imágenes no 16:9 */
+            padding: 1.5%;               /* Menos padding, más espacio para la imagen */
+            background-color: #1a1a1a;
+            background-size: contain;
+            background-position: center;
+            background-repeat: no-repeat;
         }
 
-        .slide img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;            /* Mantiene la proporción 16:9 sin recortar */
-            border-radius: 6px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
-            pointer-events: none;
-        }
-
-        /* Contenedor del reloj con estilo artesanal */
+        /* Contenedor del reloj compacto */
         .clock-container {
             flex-shrink: 0;
             text-align: center;
-            padding: 2vh 0 1vh;
+            padding: 1.5vh 0 0.5vh;      /* Menos padding vertical */
             color: #eed9b2;
-            text-shadow: 2px 2px 6px rgba(0,0,0,0.7),
-                         0 0 15px rgba(180, 130, 70, 0.6);
+            text-shadow:
+                2px 2px 6px rgba(0, 0, 0, 0.7),
+                0 0 15px rgba(180, 130, 70, 0.6);
             letter-spacing: 2px;
         }
 
-        /* Línea decorativa encima del reloj */
         .clock-separator {
             width: 80%;
             max-width: 400px;
             height: 2px;
             background: linear-gradient(to right, transparent, #b89470, transparent);
-            margin: 0 auto 1.5vh;
+            margin: 0 auto 1vh;          /* Margen inferior reducido */
             opacity: 0.7;
         }
 
@@ -110,7 +103,7 @@
             font-size: clamp(3rem, 6vw, 5rem);
             font-weight: bold;
             line-height: 1.1;
-            margin-bottom: 5px;
+            margin-bottom: 3px;
         }
 
         .clock-date {
@@ -128,12 +121,10 @@
 <body>
     <div class="overlay">
         <div class="main-container">
-            <!-- Galería -->
             <div class="gallery-container" id="galleryContainer">
                 <div class="gallery-track" id="galleryTrack"></div>
             </div>
 
-            <!-- Reloj artesanal -->
             <div class="clock-container" id="clockContainer">
                 <div class="clock-separator"></div>
                 <div class="clock-time" id="clockTime">--:--:--</div>
@@ -144,10 +135,9 @@
 
     <script>
         (function() {
-            // ---------- CONFIGURACIÓN ----------
             var MAX_IMAGES = 20;
             var AUTOPLAY_INTERVAL = 5000;
-            var TRANSITION_DURATION = 600;       // ms, debe coincidir con CSS
+            var TRANSITION_DURATION = 600;
 
             var track = document.getElementById('galleryTrack');
             var container = document.getElementById('galleryContainer');
@@ -167,23 +157,20 @@
             var startOffset = 0;
             var lastMoveX;
 
-            // Nombres en español (compatibles con cualquier navegador)
             var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
             var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-            // ---------- FONDO POR JS (máxima compatibilidad) ----------
             function cargarFondo() {
                 var img = new Image();
                 img.onload = function() {
                     body.style.backgroundImage = "url('recursos/fondo.jpeg')";
                 };
                 img.onerror = function() {
-                    body.style.backgroundColor = '#1f1a15';   // color tierra si falla
+                    body.style.backgroundColor = '#1f1a15';
                 };
                 img.src = 'recursos/fondo.jpeg';
             }
 
-            // ---------- CARGA DINÁMICA DE IMÁGENES (ignora huecos) ----------
             function cargarImagenes(callback) {
                 var validas = [];
                 var pendientes = MAX_IMAGES;
@@ -210,11 +197,7 @@
             function crearSlide(urlImagen) {
                 var div = document.createElement('div');
                 div.className = 'slide';
-                var img = document.createElement('img');
-                img.src = urlImagen;
-                img.alt = 'Producto artesanal';
-                img.draggable = false;
-                div.appendChild(img);
+                div.style.backgroundImage = "url('" + urlImagen + "')";
                 return div;
             }
 
@@ -226,6 +209,7 @@
                 if (originalCount === 0) {
                     var slide = document.createElement('div');
                     slide.className = 'slide';
+                    slide.style.backgroundImage = 'none';
                     slide.style.color = '#eed9b2';
                     slide.style.fontSize = '2.5rem';
                     slide.textContent = 'Próximamente...';
@@ -292,7 +276,6 @@
                 return -currentIndex * container.offsetWidth;
             }
 
-            // ---------- RELOJ DIGITAL EXACTO ----------
             function actualizarReloj() {
                 var ahora = new Date();
                 var h = ahora.getHours();
@@ -312,7 +295,6 @@
             actualizarReloj();
             setInterval(actualizarReloj, 1000);
 
-            // ---------- EVENTOS TÁCTILES Y RATÓN ----------
             container.addEventListener('mousedown', function(e) {
                 e.preventDefault();
                 iniciarArrastre(e.clientX);
@@ -382,7 +364,6 @@
                 reiniciarAutoTimer();
             }
 
-            // ---------- INICIO ----------
             cargarFondo();
             cargarImagenes(function(imgs) {
                 construirGaleria(imgs);
