@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Galería de productos</title>
+    <title>Galería artesanal</title>
     <style>
         * {
             margin: 0;
@@ -12,21 +12,22 @@
         }
 
         body {
-            background-color: #222;
+            background-color: #2b2b2b;          /* Respaldo oscuro */
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             background-attachment: fixed;
             height: 100vh;
             overflow: hidden;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Georgia', 'Times New Roman', serif;
             font-size: calc(14px + 0.8vmin);
+            color: #f5e6d3;
         }
 
         .overlay {
             width: 100%;
             height: 100vh;
-            background-color: rgba(0, 0, 0, 0.55);
+            background-color: rgba(20, 15, 10, 0.65);  /* Tono cálido y oscuro */
             display: flex;
             justify-content: center;
             align-items: center;
@@ -36,11 +37,12 @@
         .main-container {
             display: flex;
             flex-direction: column;
-            width: 90%;
+            width: 92%;
             max-width: 1400px;
             height: 100%;
         }
 
+        /* Galería con marco rústico */
         .gallery-container {
             flex: 1;
             min-height: 0;
@@ -48,9 +50,13 @@
             touch-action: none;
             position: relative;
             border-radius: 12px;
-            background-color: rgba(0, 0, 0, 0.3);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.4);
+            box-shadow:
+                0 0 0 3px rgba(180, 140, 100, 0.3),  /* marco externo sutil */
+                0 20px 40px rgba(0, 0, 0, 0.6),
+                inset 0 0 30px rgba(0, 0, 0, 0.5);   /* sombra interior */
             user-select: none;
+            transition: box-shadow 0.3s;
         }
 
         .gallery-track {
@@ -66,31 +72,40 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 10px;
+            padding: 15px;
+            background-color: #1a1a1a;  /* Fondo para bandas laterales en imágenes no 16:9 */
         }
 
         .slide img {
             max-width: 100%;
             max-height: 100%;
-            object-fit: contain;
+            object-fit: contain;            /* Mantiene la proporción 16:9 sin recortar */
+            border-radius: 6px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
             pointer-events: none;
-            border-radius: 8px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            transition: transform 0.3s ease, opacity 0.3s ease;
         }
 
-        /* Contenedor del reloj */
+        /* Contenedor del reloj con estilo artesanal */
         .clock-container {
             flex-shrink: 0;
             text-align: center;
             padding: 2vh 0 1vh;
-            color: #f5e6d3;               /* Tono cálido pergamino */
-            font-family: 'Georgia', 'Times New Roman', serif;  /* Rústico con remates */
-            text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.7), 0 0 15px rgba(200, 150, 80, 0.5);
+            color: #eed9b2;
+            text-shadow: 2px 2px 6px rgba(0,0,0,0.7),
+                         0 0 15px rgba(180, 130, 70, 0.6);
             letter-spacing: 2px;
         }
 
-        /* Hora principal grande */
+        /* Línea decorativa encima del reloj */
+        .clock-separator {
+            width: 80%;
+            max-width: 400px;
+            height: 2px;
+            background: linear-gradient(to right, transparent, #b89470, transparent);
+            margin: 0 auto 1.5vh;
+            opacity: 0.7;
+        }
+
         .clock-time {
             font-size: clamp(3rem, 6vw, 5rem);
             font-weight: bold;
@@ -98,30 +113,29 @@
             margin-bottom: 5px;
         }
 
-        /* Fecha secundaria un poco más pequeña */
         .clock-date {
-            font-size: clamp(1.5rem, 3vw, 2.5rem);
+            font-size: clamp(1.4rem, 2.8vw, 2.3rem);
             font-weight: normal;
             opacity: 0.9;
-            text-transform: capitalize;
+            text-transform: lowercase;
         }
 
-        /* Segundos con estilo ligeramente diferente */
-        .clock-seconds {
-            font-size: 0.7em;
-            opacity: 0.8;
+        .clock-date::first-letter {
+            text-transform: uppercase;
         }
     </style>
 </head>
 <body>
     <div class="overlay">
         <div class="main-container">
+            <!-- Galería -->
             <div class="gallery-container" id="galleryContainer">
                 <div class="gallery-track" id="galleryTrack"></div>
             </div>
 
-            <!-- Aquí va el reloj -->
+            <!-- Reloj artesanal -->
             <div class="clock-container" id="clockContainer">
+                <div class="clock-separator"></div>
                 <div class="clock-time" id="clockTime">--:--:--</div>
                 <div class="clock-date" id="clockDate">Cargando fecha...</div>
             </div>
@@ -133,13 +147,12 @@
             // ---------- CONFIGURACIÓN ----------
             var MAX_IMAGES = 20;
             var AUTOPLAY_INTERVAL = 5000;
-            var TRANSITION_DURATION = 600;
+            var TRANSITION_DURATION = 600;       // ms, debe coincidir con CSS
 
             var track = document.getElementById('galleryTrack');
             var container = document.getElementById('galleryContainer');
             var body = document.body;
 
-            // Elementos del reloj
             var clockTimeEl = document.getElementById('clockTime');
             var clockDateEl = document.getElementById('clockDate');
 
@@ -154,70 +167,69 @@
             var startOffset = 0;
             var lastMoveX;
 
-            // ---------- NOMBRES EN ESPAÑOL (compatibles con cualquier navegador) ----------
-            var DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+            // Nombres en español (compatibles con cualquier navegador)
+            var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
             var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-            // ---------- CARGA DEL FONDO ----------
-            function loadBackground() {
-                var bgImg = new Image();
-                bgImg.onload = function() {
+            // ---------- FONDO POR JS (máxima compatibilidad) ----------
+            function cargarFondo() {
+                var img = new Image();
+                img.onload = function() {
                     body.style.backgroundImage = "url('recursos/fondo.jpeg')";
                 };
-                bgImg.onerror = function() {
-                    body.style.backgroundColor = '#111';
+                img.onerror = function() {
+                    body.style.backgroundColor = '#1f1a15';   // color tierra si falla
                 };
-                bgImg.src = 'recursos/fondo.jpeg';
+                img.src = 'recursos/fondo.jpeg';
             }
 
-            // ---------- CARGA DE IMÁGENES DE LA GALERÍA ----------
-            function loadImages(callback) {
-                var validUrls = [];
-                var totalToCheck = MAX_IMAGES;
+            // ---------- CARGA DINÁMICA DE IMÁGENES (ignora huecos) ----------
+            function cargarImagenes(callback) {
+                var validas = [];
+                var pendientes = MAX_IMAGES;
 
-                function checkOne(index) {
-                    if (index > totalToCheck) {
-                        callback(validUrls);
+                function verificar(indice) {
+                    if (indice > pendientes) {
+                        callback(validas);
                         return;
                     }
-                    var url = 'img/' + index + '.jpeg';
+                    var url = 'img/' + indice + '.jpeg';
                     var img = new Image();
                     img.onload = function() {
-                        validUrls.push(url);
-                        checkOne(index + 1);
+                        validas.push(url);
+                        verificar(indice + 1);
                     };
                     img.onerror = function() {
-                        checkOne(index + 1);
+                        verificar(indice + 1);
                     };
                     img.src = url;
                 }
-                checkOne(1);
+                verificar(1);
             }
 
-            function createSlide(imageUrl) {
-                var slideDiv = document.createElement('div');
-                slideDiv.className = 'slide';
+            function crearSlide(urlImagen) {
+                var div = document.createElement('div');
+                div.className = 'slide';
                 var img = document.createElement('img');
-                img.src = imageUrl;
-                img.alt = 'Producto';
+                img.src = urlImagen;
+                img.alt = 'Producto artesanal';
                 img.draggable = false;
-                slideDiv.appendChild(img);
-                return slideDiv;
+                div.appendChild(img);
+                return div;
             }
 
-            function buildGallery(images) {
+            function construirGaleria(imagenes) {
                 track.innerHTML = '';
-                originalImages = images;
-                originalCount = images.length;
+                originalImages = imagenes;
+                originalCount = imagenes.length;
 
                 if (originalCount === 0) {
                     var slide = document.createElement('div');
                     slide.className = 'slide';
-                    slide.style.color = 'white';
+                    slide.style.color = '#eed9b2';
                     slide.style.fontSize = '2.5rem';
-                    slide.textContent = 'No hay imágenes disponibles';
+                    slide.textContent = 'Próximamente...';
                     track.appendChild(slide);
-                    originalCount = 1;
                     slides = [slide];
                     currentIndex = 0;
                     return;
@@ -226,170 +238,155 @@
                 var fragment = document.createDocumentFragment();
 
                 if (originalCount > 1) {
-                    fragment.appendChild(createSlide(images[originalCount - 1]));
+                    fragment.appendChild(crearSlide(imagenes[originalCount - 1]));
                 }
-
                 for (var i = 0; i < originalCount; i++) {
-                    fragment.appendChild(createSlide(images[i]));
+                    fragment.appendChild(crearSlide(imagenes[i]));
                 }
-
                 if (originalCount > 1) {
-                    fragment.appendChild(createSlide(images[0]));
+                    fragment.appendChild(crearSlide(imagenes[0]));
                 }
 
                 track.appendChild(fragment);
                 slides = Array.prototype.slice.call(track.children);
-
                 currentIndex = originalCount > 1 ? 1 : 0;
-                updateTransform(false);
+                actualizarTransform(false);
             }
 
-            function updateTransform(withTransition) {
-                if (withTransition === undefined) withTransition = true;
-                track.style.transition = withTransition ? 'transform ' + (TRANSITION_DURATION / 1000) + 's cubic-bezier(0.25, 0.1, 0.25, 1.0)' : 'none';
+            function actualizarTransform(conTransicion) {
+                if (conTransicion === undefined) conTransicion = true;
+                track.style.transition = conTransicion ?
+                    'transform ' + (TRANSITION_DURATION / 1000) + 's cubic-bezier(0.25, 0.1, 0.25, 1.0)' :
+                    'none';
                 track.style.transform = 'translateX(-' + (currentIndex * 100) + '%)';
             }
 
-            function resetAutoTimer() {
+            function reiniciarAutoTimer() {
                 clearInterval(autoTimer);
                 if (originalCount > 1) {
-                    autoTimer = setInterval(autoNext, AUTOPLAY_INTERVAL);
+                    autoTimer = setInterval(siguienteAuto, AUTOPLAY_INTERVAL);
                 }
             }
 
-            function autoNext() {
+            function siguienteAuto() {
                 if (isDragging || isTransitioning || originalCount <= 1) return;
                 isTransitioning = true;
                 currentIndex++;
-                updateTransform(true);
-                setTimeout(handleTransitionEnd, TRANSITION_DURATION + 50);
+                actualizarTransform(true);
+                setTimeout(manejarFinTransicion, TRANSITION_DURATION + 50);
             }
 
-            function handleTransitionEnd() {
+            function manejarFinTransicion() {
                 isTransitioning = false;
                 if (originalCount <= 1) return;
                 if (currentIndex === 0) {
                     currentIndex = originalCount;
-                    updateTransform(false);
+                    actualizarTransform(false);
                 } else if (currentIndex === slides.length - 1) {
                     currentIndex = 1;
-                    updateTransform(false);
+                    actualizarTransform(false);
                 }
             }
 
-            function getCurrentOffset() {
+            function obtenerOffsetActual() {
                 return -currentIndex * container.offsetWidth;
             }
 
-            // ---------- RELOJ DIGITAL ----------
-            function updateClock() {
+            // ---------- RELOJ DIGITAL EXACTO ----------
+            function actualizarReloj() {
                 var ahora = new Date();
+                var h = ahora.getHours();
+                var m = ahora.getMinutes();
+                var s = ahora.getSeconds();
+                clockTimeEl.textContent =
+                    (h < 10 ? '0' : '') + h + ':' +
+                    (m < 10 ? '0' : '') + m + ':' +
+                    (s < 10 ? '0' : '') + s;
 
-                // Hora con dos dígitos
-                var horas = ahora.getHours();
-                var minutos = ahora.getMinutes();
-                var segundos = ahora.getSeconds();
-
-                var strHoras = (horas < 10 ? '0' : '') + horas;
-                var strMinutos = (minutos < 10 ? '0' : '') + minutos;
-                var strSegundos = (segundos < 10 ? '0' : '') + segundos;
-
-                // Mostrar hora: HH:MM:SS
-                clockTimeEl.innerHTML = strHoras + ':' + strMinutos + ':' + strSegundos;
-
-                // Fecha
-                var diaSemana = DIAS_SEMANA[ahora.getDay()];
+                var diaSemana = DIAS[ahora.getDay()];
                 var diaMes = ahora.getDate();
                 var mes = MESES[ahora.getMonth()];
                 var anio = ahora.getFullYear();
-
                 clockDateEl.textContent = diaSemana + ', ' + diaMes + ' de ' + mes + ' de ' + anio;
             }
+            actualizarReloj();
+            setInterval(actualizarReloj, 1000);
 
-            // Actualizar el reloj inmediatamente y luego cada segundo
-            updateClock();
-            setInterval(updateClock, 1000);
-
-            // ---------- EVENTOS DE RATÓN ----------
+            // ---------- EVENTOS TÁCTILES Y RATÓN ----------
             container.addEventListener('mousedown', function(e) {
-                startDrag(e.clientX);
                 e.preventDefault();
+                iniciarArrastre(e.clientX);
             });
             window.addEventListener('mousemove', function(e) {
                 if (!isDragging) return;
-                moveDrag(e.clientX);
                 e.preventDefault();
+                moverArrastre(e.clientX);
             });
             window.addEventListener('mouseup', function(e) {
                 if (!isDragging) return;
-                endDrag(e.clientX);
                 e.preventDefault();
+                finalizarArrastre(e.clientX);
             });
 
-            // ---------- EVENTOS TÁCTILES ----------
             container.addEventListener('touchstart', function(e) {
                 if (e.touches.length === 1) {
-                    startDrag(e.touches[0].clientX);
                     e.preventDefault();
+                    iniciarArrastre(e.touches[0].clientX);
                 }
             });
             container.addEventListener('touchmove', function(e) {
                 if (!isDragging) return;
-                moveDrag(e.touches[0].clientX);
                 e.preventDefault();
+                moverArrastre(e.touches[0].clientX);
             });
             container.addEventListener('touchend', function(e) {
                 if (!isDragging) return;
-                endDrag(lastMoveX !== undefined ? lastMoveX : startPosX);
                 e.preventDefault();
+                var x = (lastMoveX !== undefined) ? lastMoveX : startPosX;
+                finalizarArrastre(x);
             });
 
-            function startDrag(clientX) {
+            function iniciarArrastre(clientX) {
                 if (originalCount <= 1) return;
                 clearInterval(autoTimer);
                 isDragging = true;
                 lastMoveX = clientX;
                 track.style.transition = 'none';
-                startOffset = getCurrentOffset();
+                startOffset = obtenerOffsetActual();
                 startPosX = clientX;
             }
 
-            function moveDrag(clientX) {
+            function moverArrastre(clientX) {
                 if (!isDragging) return;
                 lastMoveX = clientX;
-                var diffX = clientX - startPosX;
-                var newOffset = startOffset + diffX;
-                track.style.transform = 'translateX(' + newOffset + 'px)';
+                var diff = clientX - startPosX;
+                track.style.transform = 'translateX(' + (startOffset + diff) + 'px)';
             }
 
-            function endDrag(clientX) {
+            function finalizarArrastre(clientX) {
                 if (!isDragging) return;
                 isDragging = false;
                 lastMoveX = undefined;
 
-                var diffX = clientX - startPosX;
-                var endOffset = startOffset + diffX;
-                var containerWidth = container.offsetWidth;
-
-                var targetIndex = Math.round(-endOffset / containerWidth);
-                targetIndex = Math.max(0, Math.min(targetIndex, slides.length - 1));
+                var diff = clientX - startPosX;
+                var ancho = container.offsetWidth;
+                var offsetFinal = startOffset + diff;
+                var indiceObjetivo = Math.round(-offsetFinal / ancho);
+                indiceObjetivo = Math.max(0, Math.min(indiceObjetivo, slides.length - 1));
 
                 isTransitioning = true;
-                currentIndex = targetIndex;
-                updateTransform(true);
+                currentIndex = indiceObjetivo;
+                actualizarTransform(true);
 
-                setTimeout(handleTransitionEnd, TRANSITION_DURATION + 50);
-                resetAutoTimer();
+                setTimeout(manejarFinTransicion, TRANSITION_DURATION + 50);
+                reiniciarAutoTimer();
             }
 
-            // ---------- INICIALIZACIÓN ----------
-            loadBackground();
-
-            loadImages(function(images) {
-                buildGallery(images);
-                if (originalCount > 1) {
-                    resetAutoTimer();
-                }
+            // ---------- INICIO ----------
+            cargarFondo();
+            cargarImagenes(function(imgs) {
+                construirGaleria(imgs);
+                if (originalCount > 1) reiniciarAutoTimer();
             });
         })();
     </script>
