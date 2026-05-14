@@ -31,7 +31,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 2vw;               /* Márgenes reducidos */
+            padding: 2vw;
         }
 
         .main-container {
@@ -42,12 +42,10 @@
             height: 100%;
         }
 
-        /* Galería */
         .gallery-container {
-            flex: 1 1 auto;             /* Ocupa todo el espacio disponible */
+            flex: 1 1 auto;
             min-height: 0;
             overflow: hidden;
-            touch-action: none;
             position: relative;
             border-radius: 12px;
             background-color: rgba(0, 0, 0, 0.4);
@@ -55,7 +53,6 @@
                 0 0 0 3px rgba(180, 140, 100, 0.3),
                 0 20px 40px rgba(0, 0, 0, 0.6),
                 inset 0 0 30px rgba(0, 0, 0, 0.5);
-            user-select: none;
         }
 
         .gallery-track {
@@ -71,20 +68,19 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 0;                 /* Sin padding para aprovechar todo el espacio */
+            padding: 0;
             background-color: #1a1a1a;
         }
 
         .slide img {
             max-width: 100%;
             max-height: 100%;
-            object-fit: contain;        /* La imagen se muestra completa */
+            object-fit: contain;
             border-radius: 6px;
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
             pointer-events: none;
         }
 
-        /* Reloj compacto */
         .clock-container {
             flex-shrink: 0;
             text-align: center;
@@ -141,63 +137,72 @@
 
     <script>
         (function() {
-            var MAX_IMAGES = 20;
-            var AUTOPLAY_INTERVAL = 5000;
-            var TRANSITION_DURATION = 600;
+            var MAX_IMAGES = 20;                // Número máximo de imágenes que buscará
+            var AUTOPLAY_INTERVAL = 5000;       // 5 segundos entre cada cambio
+            var TRANSITION_DURATION = 600;      // Debe coincidir con CSS (0.6s)
 
             var track = document.getElementById('galleryTrack');
-            var container = document.getElementById('galleryContainer');
             var body = document.body;
-
             var clockTimeEl = document.getElementById('clockTime');
             var clockDateEl = document.getElementById('clockDate');
 
-            var originalImages = [];
+            var originalImages = [];            // URLs de imágenes válidas
             var originalCount = 0;
-            var slides = [];
-            var currentIndex = 0;
+            var slides = [];                    // Array de elementos slide (incluye clones)
+            var currentIndex = 0;               // Índice actual en el array extendido
             var autoTimer = null;
-            var isDragging = false;
             var isTransitioning = false;
-            var startPosX = 0;
-            var startOffset = 0;
-            var lastMoveX;
 
+            // Nombres en español para el reloj
             var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
             var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
+            // ---------- CARGA DEL FONDO ----------
             function cargarFondo() {
                 var img = new Image();
                 img.onload = function() {
                     body.style.backgroundImage = "url('recursos/fondo.jpeg')";
                 };
                 img.onerror = function() {
-                    body.style.backgroundColor = '#1f1a15';
+                    body.style.backgroundColor = '#1f1a15';   // Respaldo
                 };
-                img.src = 'recursos/fondo.jpeg';
+                // Añadimos un parámetro para evitar caché en TV
+                img.src = 'recursos/fondo.jpeg?v=' + new Date().getTime();
             }
 
+            // ---------- CARGA DE IMÁGENES CON REINTENTOS ----------
             function cargarImagenes(callback) {
                 var validas = [];
                 var pendientes = MAX_IMAGES;
 
-                function verificar(indice) {
+                function verificar(indice, intentosRestantes) {
                     if (indice > pendientes) {
                         callback(validas);
                         return;
                     }
-                    var url = 'img/' + indice + '.jpeg';
+
+                    // Parámetro único anti-caché (timestamp)
+                    var url = 'img/' + indice + '.jpeg?v=' + new Date().getTime();
                     var img = new Image();
                     img.onload = function() {
                         validas.push(url);
-                        verificar(indice + 1);
+                        verificar(indice + 1, 2);  // Siguiente con 2 intentos
                     };
                     img.onerror = function() {
-                        verificar(indice + 1);
+                        if (intentosRestantes > 1) {
+                            // Reintentar con otro timestamp
+                            setTimeout(function() {
+                                verificar(indice, intentosRestantes - 1);
+                            }, 500);
+                        } else {
+                            // No se pudo cargar tras reintentos: la omitimos
+                            verificar(indice + 1, 2);
+                        }
                     };
                     img.src = url;
                 }
-                verificar(1);
+
+                verificar(1, 2);  // Comienza con 2 intentos por imagen
             }
 
             function crearSlide(urlImagen) {
@@ -231,17 +236,22 @@
                 var fragment = document.createDocumentFragment();
 
                 if (originalCount > 1) {
+                    // Clon del último al principio (para bucle infinito)
                     fragment.appendChild(crearSlide(imagenes[originalCount - 1]));
                 }
+
                 for (var i = 0; i < originalCount; i++) {
                     fragment.appendChild(crearSlide(imagenes[i]));
                 }
+
                 if (originalCount > 1) {
+                    // Clon del primero al final
                     fragment.appendChild(crearSlide(imagenes[0]));
                 }
 
                 track.appendChild(fragment);
                 slides = Array.prototype.slice.call(track.children);
+                // Posicionamos en el primer slide real (índice 1 si hay clones)
                 currentIndex = originalCount > 1 ? 1 : 0;
                 actualizarTransform(false);
             }
@@ -254,7 +264,7 @@
                 track.style.transform = 'translateX(-' + (currentIndex * 100) + '%)';
             }
 
-            function reiniciarAutoTimer() {
+            function iniciarAutoAvance() {
                 clearInterval(autoTimer);
                 if (originalCount > 1) {
                     autoTimer = setInterval(siguienteAuto, AUTOPLAY_INTERVAL);
@@ -262,7 +272,7 @@
             }
 
             function siguienteAuto() {
-                if (isDragging || isTransitioning || originalCount <= 1) return;
+                if (isTransitioning || originalCount <= 1) return;
                 isTransitioning = true;
                 currentIndex++;
                 actualizarTransform(true);
@@ -272,6 +282,8 @@
             function manejarFinTransicion() {
                 isTransitioning = false;
                 if (originalCount <= 1) return;
+
+                // Si estamos en un clon, saltamos a la posición real sin animación
                 if (currentIndex === 0) {
                     currentIndex = originalCount;
                     actualizarTransform(false);
@@ -281,10 +293,7 @@
                 }
             }
 
-            function obtenerOffsetActual() {
-                return -currentIndex * container.offsetWidth;
-            }
-
+            // ---------- RELOJ DIGITAL ----------
             function actualizarReloj() {
                 var ahora = new Date();
                 var h = ahora.getHours();
@@ -304,79 +313,13 @@
             actualizarReloj();
             setInterval(actualizarReloj, 1000);
 
-            container.addEventListener('mousedown', function(e) {
-                e.preventDefault();
-                iniciarArrastre(e.clientX);
-            });
-            window.addEventListener('mousemove', function(e) {
-                if (!isDragging) return;
-                e.preventDefault();
-                moverArrastre(e.clientX);
-            });
-            window.addEventListener('mouseup', function(e) {
-                if (!isDragging) return;
-                e.preventDefault();
-                finalizarArrastre(e.clientX);
-            });
-
-            container.addEventListener('touchstart', function(e) {
-                if (e.touches.length === 1) {
-                    e.preventDefault();
-                    iniciarArrastre(e.touches[0].clientX);
-                }
-            });
-            container.addEventListener('touchmove', function(e) {
-                if (!isDragging) return;
-                e.preventDefault();
-                moverArrastre(e.touches[0].clientX);
-            });
-            container.addEventListener('touchend', function(e) {
-                if (!isDragging) return;
-                e.preventDefault();
-                var x = (lastMoveX !== undefined) ? lastMoveX : startPosX;
-                finalizarArrastre(x);
-            });
-
-            function iniciarArrastre(clientX) {
-                if (originalCount <= 1) return;
-                clearInterval(autoTimer);
-                isDragging = true;
-                lastMoveX = clientX;
-                track.style.transition = 'none';
-                startOffset = obtenerOffsetActual();
-                startPosX = clientX;
-            }
-
-            function moverArrastre(clientX) {
-                if (!isDragging) return;
-                lastMoveX = clientX;
-                var diff = clientX - startPosX;
-                track.style.transform = 'translateX(' + (startOffset + diff) + 'px)';
-            }
-
-            function finalizarArrastre(clientX) {
-                if (!isDragging) return;
-                isDragging = false;
-                lastMoveX = undefined;
-
-                var diff = clientX - startPosX;
-                var ancho = container.offsetWidth;
-                var offsetFinal = startOffset + diff;
-                var indiceObjetivo = Math.round(-offsetFinal / ancho);
-                indiceObjetivo = Math.max(0, Math.min(indiceObjetivo, slides.length - 1));
-
-                isTransitioning = true;
-                currentIndex = indiceObjetivo;
-                actualizarTransform(true);
-
-                setTimeout(manejarFinTransicion, TRANSITION_DURATION + 50);
-                reiniciarAutoTimer();
-            }
-
+            // ---------- INICIO ----------
             cargarFondo();
             cargarImagenes(function(imgs) {
                 construirGaleria(imgs);
-                if (originalCount > 1) reiniciarAutoTimer();
+                if (originalCount > 1) {
+                    iniciarAutoAvance();
+                }
             });
         })();
     </script>
