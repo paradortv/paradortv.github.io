@@ -42,6 +42,7 @@
             height: 100%;
         }
 
+        /* Galería */
         .gallery-container {
             flex: 1 1 auto;
             min-height: 0;
@@ -73,8 +74,10 @@
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
+            /* Sin sombras ni bordes para mejor rendimiento */
         }
 
+        /* Reloj (diseño rústico) */
         .clock-container {
             flex-shrink: 0;
             text-align: center;
@@ -117,9 +120,14 @@
 <body>
     <div class="overlay">
         <div class="main-container">
+            <!-- Galería de imágenes -->
             <div class="gallery-container" id="galleryContainer">
-                <div class="gallery-track" id="galleryTrack"></div>
+                <div class="gallery-track" id="galleryTrack">
+                    <!-- Los 3 slides se generan dinámicamente -->
+                </div>
             </div>
+
+            <!-- Reloj -->
             <div class="clock-container">
                 <div class="clock-separator"></div>
                 <div class="clock-time" id="clockTime">--:--:--</div>
@@ -130,13 +138,10 @@
 
     <script>
         (function() {
-            // ---------- CONFIGURACIÓN ----------
-            var MAX_IMAGES = 20;                // Intentará cargar hasta 20 imágenes
-            var TRANSITION_DURATION = 400;      // Duración de la transición en milisegundos (0.4s)
-
-            // Tiempos de exposición (en milisegundos)
-            var DURACION_PRIMERA = 10000;       // 10 segundos para la imagen 1.jpeg
-            var DURACION_OTRAS = 3000;          // 3 segundos para el resto
+            // Configuración
+            var MAX_IMAGES = 20;                // Máximo de imágenes a buscar
+            var AUTOPLAY_INTERVAL = 5000;       // 5 segundos entre cambios
+            var TRANSITION_DURATION = 400;      // Duración de la transición (ms)
 
             // Elementos del DOM
             var track = document.getElementById('galleryTrack');
@@ -145,20 +150,20 @@
             var clockDateEl = document.getElementById('clockDate');
 
             // Estado de la galería
-            var originalImages = [];            // URLs base (sin parámetro anti-caché)
+            var originalImages = [];            // URLs válidas
             var originalCount = 0;
-            var currentIndex = 0;               // Índice actual (0 = primera imagen)
+            var currentIndex = 0;               // Índice de la imagen activa (0..originalCount-1)
+            var autoTimer = null;
             var isTransitioning = false;
-            var timeoutId = null;
 
-            // Los 3 slides fijos para máximo rendimiento
+            // Los 3 slides fijos (izquierda, centro, derecha)
             var slideLeft, slideCenter, slideRight;
 
             // Nombres en español para el reloj
             var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
             var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-            // ---------- CARGA DEL FONDO (anti-caché) ----------
+            // ---------- CARGA DEL FONDO (misma técnica anti-caché) ----------
             function cargarFondo() {
                 var img = new Image();
                 img.onload = function() {
@@ -170,8 +175,7 @@
                 img.src = 'recursos/fondo.jpeg?v=' + Date.now();
             }
 
-            // ---------- CARGA DE IMÁGENES CON REINTENTOS ----------
-            // Almacena las URLs sin el parámetro ?v= para poder identificar fácilmente la imagen 1
+            // ---------- CARGA DE IMÁGENES CON REINTENTOS Y ANTI-CACHÉ ----------
             function cargarImagenes(callback) {
                 var validas = [];
                 var total = MAX_IMAGES;
@@ -182,43 +186,42 @@
                         return;
                     }
 
-                    var urlBase = 'img/' + indice + '.jpeg';
-                    var urlConCache = urlBase + '?v=' + Date.now();
+                    // Parámetro único para evitar caché
+                    var url = 'img/' + indice + '.jpeg?v=' + Date.now();
                     var img = new Image();
 
                     img.onload = function() {
-                        validas.push(urlBase);   // Guardamos la URL limpia
-                        verificar(indice + 1, 2);
+                        validas.push(url);
+                        verificar(indice + 1, 2);  // Pasamos al siguiente con 2 intentos
                     };
 
                     img.onerror = function() {
                         if (intentos > 1) {
+                            // Reintentar tras un breve retardo
                             setTimeout(function() {
                                 verificar(indice, intentos - 1);
                             }, 600);
                         } else {
+                            // Descartamos esta imagen y seguimos con la siguiente
                             verificar(indice + 1, 2);
                         }
                     };
 
-                    img.src = urlConCache;
+                    img.src = url;
                 }
 
-                verificar(1, 2);
+                verificar(1, 2);  // Empezamos con 2 intentos por imagen
             }
 
-            // ---------- CONSTRUCCIÓN DE LA GALERÍA ----------
+            // ---------- CONSTRUCCIÓN DE LA GALERÍA (3 slides dinámicos) ----------
             function construirGaleria(imagenes) {
                 originalImages = imagenes;
                 originalCount = imagenes.length;
 
-                // Limpiar todo
                 track.innerHTML = '';
-                clearTimeout(timeoutId);
-                isTransitioning = false;
 
-                // Caso sin imágenes
                 if (originalCount === 0) {
+                    // Sin imágenes: mostramos un mensaje bonito
                     var slide = document.createElement('div');
                     slide.className = 'slide';
                     slide.style.flex = '0 0 100%';
@@ -231,8 +234,8 @@
                     return;
                 }
 
-                // Solo una imagen
                 if (originalCount === 1) {
+                    // Solo una imagen: un único slide
                     var unica = crearSlideConImagen(imagenes[0]);
                     unica.style.flex = '0 0 100%';
                     track.appendChild(unica);
@@ -241,7 +244,7 @@
                     return;
                 }
 
-                // Crear los 3 slides permanentes
+                // Crear los 3 slides fijos
                 slideLeft = document.createElement('div');
                 slideLeft.className = 'slide';
                 slideCenter = document.createElement('div');
@@ -253,66 +256,63 @@
                 track.appendChild(slideCenter);
                 track.appendChild(slideRight);
 
-                // Centrar el track en el slide central (-100%)
+                // Centramos la vista en el slide central
                 track.style.transform = 'translate3d(-100%, 0, 0)';
                 currentIndex = 0;
                 actualizarSlides();
-                programarSiguiente();       // Inicia el temporizador con la duración adecuada
             }
 
-            // Crea un slide con una imagen (añade parámetro anti-caché al mostrar)
-            function crearSlideConImagen(urlBase) {
+            function crearSlideConImagen(url) {
                 var div = document.createElement('div');
                 div.className = 'slide';
                 var img = document.createElement('img');
-                img.src = urlBase + '?v=' + Date.now();   // Anti-caché al usarla
+                img.src = url;
                 img.alt = 'Producto artesanal';
                 img.draggable = false;
                 div.appendChild(img);
                 return div;
             }
 
-            // Actualiza las imágenes de los tres slides según currentIndex
+            // Actualiza las imágenes de los 3 slides según el índice actual
             function actualizarSlides() {
                 if (originalCount <= 1) return;
 
                 var prevIndex = (currentIndex - 1 + originalCount) % originalCount;
                 var nextIndex = (currentIndex + 1) % originalCount;
 
-                // Limpiar slides
+                // Limpiar slides anteriores
                 slideLeft.innerHTML = '';
                 slideCenter.innerHTML = '';
                 slideRight.innerHTML = '';
 
-                // Insertar imágenes con anti-caché fresco
+                // Insertar nuevas imágenes
                 var imgPrev = document.createElement('img');
-                imgPrev.src = originalImages[prevIndex] + '?v=' + Date.now();
+                imgPrev.src = originalImages[prevIndex];
                 imgPrev.alt = '';
                 imgPrev.draggable = false;
                 slideLeft.appendChild(imgPrev);
 
                 var imgCurr = document.createElement('img');
-                imgCurr.src = originalImages[currentIndex] + '?v=' + Date.now();
+                imgCurr.src = originalImages[currentIndex];
                 imgCurr.alt = '';
                 imgCurr.draggable = false;
                 slideCenter.appendChild(imgCurr);
 
                 var imgNext = document.createElement('img');
-                imgNext.src = originalImages[nextIndex] + '?v=' + Date.now();
+                imgNext.src = originalImages[nextIndex];
                 imgNext.alt = '';
                 imgNext.draggable = false;
                 slideRight.appendChild(imgNext);
 
-                // Reposicionar sin animación
+                // Reposicionar el track sin transición
                 track.style.transition = 'none';
                 track.style.transform = 'translate3d(-100%, 0, 0)';
             }
 
-            // Desplaza el carrusel en una dirección ('next' o 'prev')
+            // Mueve el carrusel en la dirección indicada ('next' o 'prev')
             function moverSlide(direccion) {
                 if (isTransitioning || originalCount <= 1) return;
                 isTransitioning = true;
-                clearTimeout(timeoutId);
 
                 if (direccion === 'next') {
                     currentIndex = (currentIndex + 1) % originalCount;
@@ -324,32 +324,21 @@
                     track.style.transform = 'translate3d(0, 0, 0)';
                 }
 
-                // Después de la transición, reubicar y preparar el siguiente avance
+                // Al terminar la transición, recolocamos y actualizamos los slides
                 setTimeout(function() {
                     track.style.transition = 'none';
                     actualizarSlides();
                     isTransitioning = false;
-                    programarSiguiente();   // Calcula el tiempo para la nueva imagen activa
                 }, TRANSITION_DURATION);
             }
 
-            // Determina cuánto debe durar la imagen actual
-            function obtenerDuracionActual() {
-                // Compara con 'img/1.jpeg' exactamente
-                if (originalImages[currentIndex] === 'img/1.jpeg') {
-                    return DURACION_PRIMERA;      // 10 segundos
+            function iniciarAutoAvance() {
+                clearInterval(autoTimer);
+                if (originalCount > 1) {
+                    autoTimer = setInterval(function() {
+                        moverSlide('next');
+                    }, AUTOPLAY_INTERVAL);
                 }
-                return DURACION_OTRAS;            // 3 segundos
-            }
-
-            // Programa el siguiente avance automático
-            function programarSiguiente() {
-                clearTimeout(timeoutId);
-                if (originalCount <= 1) return;
-                var duracion = obtenerDuracionActual();
-                timeoutId = setTimeout(function() {
-                    moverSlide('next');
-                }, duracion);
             }
 
             // ---------- RELOJ DIGITAL EXACTO ----------
@@ -374,6 +363,9 @@
             cargarFondo();
             cargarImagenes(function(imgs) {
                 construirGaleria(imgs);
+                if (originalCount > 1) {
+                    iniciarAutoAvance();
+                }
             });
         })();
     </script>
