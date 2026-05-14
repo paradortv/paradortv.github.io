@@ -12,7 +12,7 @@
         }
 
         body {
-            background-color: #2b2b2b;            /* Respaldo oscuro */
+            background-color: #2b2b2b;
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -42,7 +42,6 @@
             height: 100%;
         }
 
-        /* Contenedor del video (mismo lugar que la galería) */
         .video-container {
             flex: 1 1 auto;
             min-height: 0;
@@ -50,16 +49,31 @@
             background-color: #1a1a1a;
             box-shadow: 0 0 2px rgba(180, 140, 100, 0.3);
             overflow: hidden;
+            position: relative;
+        }
+
+        /* Imagen de respaldo (se muestra si el video no arranca) */
+        .fallback-image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            background: #1a1a1a;
+            display: block;               /* Visible por defecto */
+            z-index: 2;
         }
 
         .video-container video {
             width: 100%;
             height: 100%;
-            object-fit: contain;       /* Se adapta sin recortes (bandas negras si no es 16:9 exacto) */
-            background: #1a1a1a;       /* Color de las bandas */
+            object-fit: contain;
+            background: #1a1a1a;
+            position: relative;
+            z-index: 1;
         }
 
-        /* Reloj (idéntico al diseño anterior) */
         .clock-container {
             flex-shrink: 0;
             text-align: center;
@@ -102,16 +116,16 @@
 <body>
     <div class="overlay">
         <div class="main-container">
-            <!-- VIDEO -->
-            <div class="video-container">
-                <video id="promoVideo" autoplay loop muted playsinline preload="auto">
+            <div class="video-container" id="videoContainer">
+                <!-- Imagen estática de respaldo (prioritaria) -->
+                <img id="fallbackImg" class="fallback-image" src="img/poster.jpg" alt="Vista previa">
+                <!-- Video (oculto debajo del poster mientras no esté reproduciéndose) -->
+                <video id="promoVideo" autoplay loop muted playsinline preload="metadata"
+                       poster="img/poster.jpg">
                     <source src="img/video.mp4" type="video/mp4">
-                    <!-- Fallback por si el formato no es soportado -->
-                    Tu televisor no puede reproducir este video.
                 </video>
             </div>
 
-            <!-- RELOJ -->
             <div class="clock-container">
                 <div class="clock-separator"></div>
                 <div class="clock-time" id="clockTime">--:--:--</div>
@@ -125,30 +139,36 @@
             var body = document.body;
             var clockTimeEl = document.getElementById('clockTime');
             var clockDateEl = document.getElementById('clockDate');
+            var video = document.getElementById('promoVideo');
+            var fallbackImg = document.getElementById('fallbackImg');
+            var videoContainer = document.getElementById('videoContainer');
 
-            // Nombres en español para el reloj (compatibles con navegadores antiguos)
             var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
             var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-            // ---------- CARGA DEL FONDO (misma técnica compatible) ----------
+            // Estados
+            var videoLoaded = false;
+            var timeoutId = null;
+            var retryInterval = 30000; // Reintentar cada 30 segundos si falló
+
+            // ---------- CARGA DEL FONDO ----------
             function cargarFondo() {
                 var img = new Image();
                 img.onload = function() {
                     body.style.backgroundImage = "url('recursos/fondo.jpeg?v=" + Date.now() + "')";
                 };
                 img.onerror = function() {
-                    body.style.backgroundColor = '#1f1a15';   // Tono tierra si falla
+                    body.style.backgroundColor = '#1f1a15';
                 };
                 img.src = 'recursos/fondo.jpeg?v=' + Date.now();
             }
 
-            // ---------- RELOJ DIGITAL EXACTO ----------
+            // ---------- RELOJ ----------
             function actualizarReloj() {
                 var ahora = new Date();
                 var h = ahora.getHours();
                 var m = ahora.getMinutes();
                 var s = ahora.getSeconds();
-
                 clockTimeEl.textContent =
                     (h < 10 ? '0' : '') + h + ':' +
                     (m < 10 ? '0' : '') + m + ':' +
@@ -158,18 +178,94 @@
                 var mes = MESES[ahora.getMonth()];
                 clockDateEl.textContent = dia + ', ' + ahora.getDate() + ' de ' + mes + ' de ' + ahora.getFullYear();
             }
-
             actualizarReloj();
             setInterval(actualizarReloj, 1000);
 
-            // ---------- INICIO ----------
-            cargarFondo();
+            // ---------- LÓGICA DEL VIDEO ----------
+            function mostrarPoster() {
+                fallbackImg.style.display = 'block';
+                video.style.display = 'none';      // Ocultamos el video para que no consuma recursos
+            }
 
-            // Opcional: intentar reproducir el video por si el autoplay falla en algún TV muy restrictivo
-            var video = document.getElementById('promoVideo');
-            video.play().catch(function(err) {
-                // Si falla, no hacemos nada (es raro con muted)
+            function mostrarVideo() {
+                fallbackImg.style.display = 'none';
+                video.style.display = 'block';
+                videoLoaded = true;
+                if (timeoutId) clearTimeout(timeoutId);
+            }
+
+            function iniciarReproduccion() {
+                video.play().then(function() {
+                    // La reproducción comenzó
+                    mostrarVideo();
+                }).catch(function(err) {
+                    // Error al reproducir (probablemente por falta de datos)
+                    console.log('Reproducción fallida, esperando...');
+                    // Esperamos un poco y reintentamos
+                    setTimeout(function() {
+                        if (!videoLoaded) video.play();
+                    }, 1000);
+                });
+            }
+
+            function cargarVideo() {
+                // Reiniciar estado
+                videoLoaded = false;
+                video.currentTime = 0;
+                video.pause();
+                mostrarPoster();
+
+                // Timeout de seguridad: si en 6 segundos no se reproduce, se queda con el poster
+                timeoutId = setTimeout(function() {
+                    if (!videoLoaded) {
+                        console.log('Video no arrancó, mostrando fallback permanente');
+                        mostrarPoster();
+                        // Programar reintento en 30s
+                        setTimeout(cargarVideo, retryInterval);
+                    }
+                }, 6000);
+
+                // Forzar carga del video con fetch para evitar problemas de caché
+                var url = 'img/video.mp4?v=' + Date.now();
+                fetch(url, { mode: 'cors' })  // Intentamos con fetch; si falla (archivo local), el video src hará lo suyo
+                    .then(function(response) {
+                        if (response.ok) {
+                            // Asignamos blob al video para un control más fino
+                            return response.blob();
+                        }
+                        throw new Error('No se pudo descargar');
+                    })
+                    .then(function(blob) {
+                        var blobUrl = URL.createObjectURL(blob);
+                        video.src = blobUrl;
+                        video.load();
+                        iniciarReproduccion();
+                    })
+                    .catch(function() {
+                        // Si fetch falla (muy probable en local), usamos la carga normal
+                        console.log('Fetch no disponible, carga normal');
+                        video.src = 'img/video.mp4?v=' + Date.now();
+                        video.load();
+                        iniciarReproduccion();
+                    });
+            }
+
+            // Eventos nativos del video (por si fetch no se usó)
+            video.addEventListener('playing', function() {
+                mostrarVideo();
             });
+            video.addEventListener('error', function() {
+                if (!videoLoaded) {
+                    clearTimeout(timeoutId);
+                    mostrarPoster();
+                    // Reintentar en 30 segundos
+                    setTimeout(cargarVideo, retryInterval);
+                }
+            });
+
+            // Iniciar la primera carga
+            cargarFondo();
+            cargarVideo();
         })();
     </script>
 </body>
