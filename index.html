@@ -111,32 +111,28 @@
     <script>
         (function() {
             var MAX_IMAGES = 20;
-            var TRANS_DUR = 400;            // ms
-            var DURACION_PRIMERA = 10000;   // 10s
-            var DURACION_OTRAS = 3000;      // 3s
+            var TRANS_DUR = 400;
+            var DURACION_PRIMERA = 10000;   // 10 segundos para la imagen 1
+            var DURACION_OTRAS = 3000;      // 3 segundos para el resto
 
             var track = document.getElementById('galleryTrack');
             var body = document.body;
             var clockTimeEl = document.getElementById('clockTime');
             var clockDateEl = document.getElementById('clockDate');
 
-            // Lista de números de imágenes válidas (1,2,3...)
-            var imageNumbers = [];
-            var totalImages = 0;
-
-            // Control del carrusel
-            var currentRealIndex = 0;      // índice en imageNumbers (0..total-1)
-            var currentSlideIndex = 0;     // índice en el array extendido (con clones)
-            var autoTimer = null;
+            var imageNumbers = [];          // Números de las imágenes existentes (ej: 1, 2, 5...)
+            var currentIdx = 0;             // Índice actual en imageNumbers
             var isTransitioning = false;
+            var autoTimer = null;
 
-            // Arrays del DOM
-            var slides = [];               // todas las slides (incluye clones)
+            // Los 3 slides fijos y sus imágenes
+            var slideLeft, slideCenter, slideRight;
+            var imgLeft, imgCenter, imgRight;
 
             var DIAS = ['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
             var MESES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 
-            // ---------- CARGA DEL FONDO ----------
+            // ---------- FONDO ----------
             function cargarFondo() {
                 var img = new Image();
                 img.onload = function() {
@@ -148,150 +144,164 @@
                 img.src = 'recursos/fondo.jpeg?v=' + Date.now();
             }
 
-            // ---------- PRECARGA DE TODAS LAS IMÁGENES ----------
-            function precargarTodas(callback) {
-                var cargadas = [];
-                var fallidas = [];
-                var total = MAX_IMAGES;
+            // ---------- CARGA DE IMÁGENES (con reintentos) ----------
+            function cargarImagenes(callback) {
+                var encontradas = [];
+                var pendientes = MAX_IMAGES;
 
-                function verificar(num) {
-                    if (num > total) {
-                        callback(cargadas);
+                function comprobar(num, intentos) {
+                    if (num > pendientes) {
+                        callback(encontradas);
                         return;
                     }
-                    var url = 'img/' + num + '.jpeg';
+                    var url = 'img/' + num + '.jpeg?v=' + Date.now();
                     var img = new Image();
                     img.onload = function() {
-                        cargadas.push(num);
-                        verificar(num + 1);
+                        encontradas.push(num);
+                        comprobar(num + 1, 2);
                     };
                     img.onerror = function() {
-                        // Intentar una segunda vez
-                        var img2 = new Image();
-                        img2.onload = function() {
-                            cargadas.push(num);
-                            verificar(num + 1);
-                        };
-                        img2.onerror = function() {
-                            verificar(num + 1);
-                        };
-                        img2.src = url + '?v=' + Date.now();
+                        if (intentos > 1) {
+                            setTimeout(function() { comprobar(num, intentos - 1); }, 400);
+                        } else {
+                            comprobar(num + 1, 2);
+                        }
                     };
-                    img.src = url + '?v=' + Date.now();
+                    img.src = url;
                 }
-                verificar(1);
+                comprobar(1, 2);
             }
 
-            // ---------- CONSTRUIR EL CARRUSEL CON CLONES ----------
-            function construirCarrusel(nums) {
+            // ---------- ACTUALIZAR LOS SRC (sin parpadeo, porque se usa después de precargar) ----------
+            function refrescarSlides() {
+                if (imageNumbers.length <= 1) return;
+
+                var prevIdx = (currentIdx - 1 + imageNumbers.length) % imageNumbers.length;
+                var nextIdx = (currentIdx + 1) % imageNumbers.length;
+                var ahora = Date.now();
+
+                // Solo cambiamos los src, los elementos img ya existen
+                imgLeft.src = 'img/' + imageNumbers[prevIdx] + '.jpeg?v=' + ahora;
+                imgCenter.src = 'img/' + imageNumbers[currentIdx] + '.jpeg?v=' + ahora;
+                imgRight.src = 'img/' + imageNumbers[nextIdx] + '.jpeg?v=' + ahora;
+
+                track.style.transition = 'none';
+                track.style.transform = 'translate3d(-100%, 0, 0)';
+            }
+
+            // ---------- CONSTRUCCIÓN INICIAL ----------
+            function construirGaleria(nums) {
                 imageNumbers = nums;
-                totalImages = nums.length;
+                var total = nums.length;
                 track.innerHTML = '';
-                slides = [];
                 clearTimeout(autoTimer);
                 isTransitioning = false;
 
-                if (totalImages === 0) {
-                    var div = document.createElement('div');
-                    div.className = 'slide';
-                    div.style.flex = '0 0 100%';
-                    div.style.color = '#eed9b2';
-                    div.style.fontSize = '2.5rem';
-                    div.textContent = 'Próximamente...';
-                    track.appendChild(div);
-                    slides = [div];
-                    currentRealIndex = 0;
-                    currentSlideIndex = 0;
-                    return;
-                }
-
-                if (totalImages === 1) {
-                    var slide = crearSlideConImagen(nums[0]);
+                if (total === 0) {
+                    var slide = document.createElement('div');
+                    slide.className = 'slide';
                     slide.style.flex = '0 0 100%';
+                    slide.style.color = '#eed9b2';
+                    slide.style.fontSize = '2.5rem';
+                    slide.textContent = 'Próximamente...';
                     track.appendChild(slide);
-                    slides = [slide];
-                    currentRealIndex = 0;
-                    currentSlideIndex = 0;
+                    imgLeft = imgCenter = imgRight = null;
+                    currentIdx = 0;
                     return;
                 }
 
-                // Clon del último al principio
-                var cloneInicio = crearSlideConImagen(nums[totalImages - 1]);
-                track.appendChild(cloneInicio);
+                // Crear los tres slides con sus imágenes fijas
+                slideLeft = document.createElement('div'); slideLeft.className = 'slide';
+                slideCenter = document.createElement('div'); slideCenter.className = 'slide';
+                slideRight = document.createElement('div'); slideRight.className = 'slide';
 
-                // Slides originales
-                for (var i = 0; i < totalImages; i++) {
-                    var sl = crearSlideConImagen(nums[i]);
-                    track.appendChild(sl);
+                imgLeft = document.createElement('img'); imgLeft.draggable = false;
+                imgCenter = document.createElement('img'); imgCenter.draggable = false;
+                imgRight = document.createElement('img'); imgRight.draggable = false;
+
+                slideLeft.appendChild(imgLeft);
+                slideCenter.appendChild(imgCenter);
+                slideRight.appendChild(imgRight);
+
+                track.appendChild(slideLeft);
+                track.appendChild(slideCenter);
+                track.appendChild(slideRight);
+
+                if (total === 1) {
+                    imgCenter.src = 'img/' + nums[0] + '.jpeg?v=' + Date.now();
+                    slideLeft.style.display = 'none';
+                    slideRight.style.display = 'none';
+                    slideCenter.style.flex = '0 0 100%';
+                    imgLeft = imgCenter;
+                    imgRight = imgCenter;
+                    currentIdx = 0;
+                    return;
                 }
 
-                // Clon del primero al final
-                var cloneFin = crearSlideConImagen(nums[0]);
-                track.appendChild(cloneFin);
-
-                slides = Array.prototype.slice.call(track.children);
-
-                // Empezamos en la primera imagen real (índice 1 en el array extendido)
-                currentSlideIndex = 1;
-                currentRealIndex = 0;
-                track.style.transition = 'none';
-                track.style.transform = 'translate3d(-' + (currentSlideIndex * 100) + '%, 0, 0)';
-
-                // Iniciar temporizador
+                // Posicionar en la primera imagen real
+                track.style.transform = 'translate3d(-100%, 0, 0)';
+                currentIdx = 0;
+                refrescarSlides();        // Carga inicial de los 3 slides
                 programarSiguiente();
             }
 
-            function crearSlideConImagen(num) {
-                var div = document.createElement('div');
-                div.className = 'slide';
-                var img = document.createElement('img');
-                // La imagen ya está precargada en caché, usamos la misma URL base sin ?v=
-                img.src = 'img/' + num + '.jpeg';
-                img.alt = '';
-                img.draggable = false;
-                div.appendChild(img);
-                return div;
-            }
-
-            // ---------- TRANSICIÓN (solo movimiento) ----------
-            function moverAdelante() {
-                if (isTransitioning || totalImages <= 1) return;
+            // ---------- PRECARGA Y TRANSICIÓN ----------
+            function precargarYTransitar(direccion) {
+                if (isTransitioning || imageNumbers.length <= 1) return;
                 isTransitioning = true;
                 clearTimeout(autoTimer);
 
-                currentSlideIndex++;
-                currentRealIndex = (currentRealIndex + 1) % totalImages;
+                var total = imageNumbers.length;
+                var destinoIdx;
+                if (direccion === 'next') {
+                    destinoIdx = (currentIdx + 1) % total;
+                } else {
+                    destinoIdx = (currentIdx - 1 + total) % total;
+                }
 
-                track.style.transition = 'transform ' + (TRANS_DUR / 1000) + 's ease-out';
-                track.style.transform = 'translate3d(-' + (currentSlideIndex * 100) + '%, 0, 0)';
+                // Precargar la imagen destino
+                var urlPrecarga = 'img/' + imageNumbers[destinoIdx] + '.jpeg?v=' + Date.now();
+                var precarga = new Image();
+                precarga.onload = function() {
+                    ejecutarTransicion(destinoIdx, direccion);
+                };
+                precarga.onerror = function() {
+                    // Aunque falle, intentamos la transición
+                    ejecutarTransicion(destinoIdx, direccion);
+                };
+                precarga.src = urlPrecarga;
+            }
+
+            function ejecutarTransicion(destinoIdx, direccion) {
+                currentIdx = destinoIdx;
+
+                if (direccion === 'next') {
+                    track.style.transition = 'transform ' + (TRANS_DUR / 1000) + 's ease-out';
+                    track.style.transform = 'translate3d(-200%, 0, 0)';
+                } else {
+                    track.style.transition = 'transform ' + (TRANS_DUR / 1000) + 's ease-out';
+                    track.style.transform = 'translate3d(0, 0, 0)';
+                }
 
                 setTimeout(function() {
-                    // Si llegamos a un clon, saltamos al real
-                    if (currentSlideIndex === 0) {
-                        currentSlideIndex = totalImages;   // último real
-                        currentRealIndex = totalImages - 1;
-                        track.style.transition = 'none';
-                        track.style.transform = 'translate3d(-' + (currentSlideIndex * 100) + '%, 0, 0)';
-                    } else if (currentSlideIndex === slides.length - 1) {
-                        currentSlideIndex = 1;             // primer real
-                        currentRealIndex = 0;
-                        track.style.transition = 'none';
-                        track.style.transform = 'translate3d(-' + (currentSlideIndex * 100) + '%, 0, 0)';
-                    }
+                    // Actualizar los otros slides (izquierda y derecha) y reposicionar
+                    refrescarSlides();
                     isTransitioning = false;
                     programarSiguiente();
                 }, TRANS_DUR);
             }
 
+            // ---------- CONTROL DE TIEMPOS ----------
             function obtenerDuracion() {
-                return (imageNumbers[currentRealIndex] === 1) ? DURACION_PRIMERA : DURACION_OTRAS;
+                // Solo la imagen cuyo número es 1 recibe 10s
+                return (imageNumbers[currentIdx] === 1) ? DURACION_PRIMERA : DURACION_OTRAS;
             }
 
             function programarSiguiente() {
                 clearTimeout(autoTimer);
-                if (totalImages <= 1) return;
+                if (imageNumbers.length <= 1) return;
                 autoTimer = setTimeout(function() {
-                    moverAdelante();
+                    precargarYTransitar('next');
                 }, obtenerDuracion());
             }
 
@@ -311,8 +321,8 @@
 
             // ---------- ARRANQUE ----------
             cargarFondo();
-            precargarTodas(function(nums) {
-                construirCarrusel(nums);
+            cargarImagenes(function(nums) {
+                construirGaleria(nums);
             });
         })();
     </script>
