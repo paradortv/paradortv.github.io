@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Galería artesanal</title>
+    <title>Artesanías | Video</title>
     <style>
         * {
             margin: 0;
@@ -12,7 +12,7 @@
         }
 
         body {
-            background-color: #2b2b2b;
+            background-color: #2b2b2b;            /* Respaldo oscuro */
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -42,42 +42,24 @@
             height: 100%;
         }
 
-        .gallery-container {
+        /* Contenedor del video (mismo lugar que la galería) */
+        .video-container {
             flex: 1 1 auto;
             min-height: 0;
-            overflow: hidden;
-            position: relative;
             border-radius: 8px;
-            background-color: rgba(0, 0, 0, 0.5);
-            /* Sombra sutil sin impacto */
-            box-shadow: 0 0 2px rgba(180, 140, 100, 0.3);
-        }
-
-        .gallery-track {
-            display: flex;
-            height: 100%;
-            /* Transición rápida y suave con aceleración hardware */
-            transition: transform 0.4s ease-out;
-            will-change: transform;
-        }
-
-        .slide {
-            flex: 0 0 100%;
-            height: 100%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 5px;
             background-color: #1a1a1a;
+            box-shadow: 0 0 2px rgba(180, 140, 100, 0.3);
+            overflow: hidden;
         }
 
-        .slide img {
-            max-width: 100%;
-            max-height: 100%;
-            object-fit: contain;
-            /* Sin sombras ni bordes redondeados para evitar repintados */
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;       /* Se adapta sin recortes (bandas negras si no es 16:9 exacto) */
+            background: #1a1a1a;       /* Color de las bandas */
         }
 
+        /* Reloj (idéntico al diseño anterior) */
         .clock-container {
             flex-shrink: 0;
             text-align: center;
@@ -120,13 +102,17 @@
 <body>
     <div class="overlay">
         <div class="main-container">
-            <div class="gallery-container" id="galleryContainer">
-                <div class="gallery-track" id="galleryTrack">
-                    <!-- Solo 3 slides se generan dinámicamente -->
-                </div>
+            <!-- VIDEO -->
+            <div class="video-container">
+                <video id="promoVideo" autoplay loop muted playsinline preload="auto">
+                    <source src="img/video.mp4" type="video/mp4">
+                    <!-- Fallback por si el formato no es soportado -->
+                    Tu televisor no puede reproducir este video.
+                </video>
             </div>
 
-            <div class="clock-container" id="clockContainer">
+            <!-- RELOJ -->
+            <div class="clock-container">
                 <div class="clock-separator"></div>
                 <div class="clock-time" id="clockTime">--:--:--</div>
                 <div class="clock-date" id="clockDate">Cargando fecha...</div>
@@ -136,213 +122,33 @@
 
     <script>
         (function() {
-            var MAX_IMAGES = 20;
-            var AUTOPLAY_INTERVAL = 5000;       // 5 segundos
-            var TRANSITION_DURATION = 400;      // ms, debe coincidir con CSS (0.4s)
-
-            var track = document.getElementById('galleryTrack');
-            var container = document.getElementById('galleryContainer');
             var body = document.body;
             var clockTimeEl = document.getElementById('clockTime');
             var clockDateEl = document.getElementById('clockDate');
 
-            var originalImages = [];            // URLs válidas
-            var originalCount = 0;
-            var currentIndex = 0;               // Índice de la imagen activa (0..originalCount-1)
-            var autoTimer = null;
-            var isTransitioning = false;
-
-            // Referencias a los 3 slides fijos
-            var slideLeft, slideCenter, slideRight;
-
+            // Nombres en español para el reloj (compatibles con navegadores antiguos)
             var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
             var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
-            // ---------- CARGA DEL FONDO ----------
+            // ---------- CARGA DEL FONDO (misma técnica compatible) ----------
             function cargarFondo() {
                 var img = new Image();
                 img.onload = function() {
                     body.style.backgroundImage = "url('recursos/fondo.jpeg?v=" + Date.now() + "')";
                 };
                 img.onerror = function() {
-                    body.style.backgroundColor = '#1f1a15';
+                    body.style.backgroundColor = '#1f1a15';   // Tono tierra si falla
                 };
                 img.src = 'recursos/fondo.jpeg?v=' + Date.now();
             }
 
-            // ---------- CARGA DE IMÁGENES CON REINTENTOS ----------
-            function cargarImagenes(callback) {
-                var validas = [];
-                var pendientes = MAX_IMAGES;
-
-                function verificar(indice, intentos) {
-                    if (indice > pendientes) {
-                        callback(validas);
-                        return;
-                    }
-
-                    var url = 'img/' + indice + '.jpeg?v=' + Date.now();
-                    var img = new Image();
-                    img.onload = function() {
-                        validas.push(url);
-                        verificar(indice + 1, 2);
-                    };
-                    img.onerror = function() {
-                        if (intentos > 1) {
-                            setTimeout(function() {
-                                verificar(indice, intentos - 1);
-                            }, 800);
-                        } else {
-                            // Omitir imagen que no existe
-                            verificar(indice + 1, 2);
-                        }
-                    };
-                    img.src = url;
-                }
-
-                verificar(1, 2);
-            }
-
-            // ---------- CONSTRUCCIÓN DE LA GALERÍA (3 slides dinámicos) ----------
-            function construirGaleria(imagenes) {
-                originalImages = imagenes;
-                originalCount = imagenes.length;
-
-                track.innerHTML = '';
-
-                if (originalCount === 0) {
-                    var slide = document.createElement('div');
-                    slide.className = 'slide';
-                    slide.style.color = '#eed9b2';
-                    slide.style.fontSize = '2.5rem';
-                    slide.textContent = 'Próximamente...';
-                    slide.style.flex = '0 0 100%';
-                    track.appendChild(slide);
-                    slideLeft = slideCenter = slideRight = slide;
-                    currentIndex = 0;
-                    return;
-                }
-
-                if (originalCount === 1) {
-                    var unicaSlide = crearSlideConImagen(imagenes[0]);
-                    unicaSlide.style.flex = '0 0 100%';
-                    track.appendChild(unicaSlide);
-                    slideLeft = slideCenter = slideRight = unicaSlide;
-                    currentIndex = 0;
-                    return;
-                }
-
-                // Crear los 3 slides fijos
-                slideLeft = document.createElement('div');
-                slideLeft.className = 'slide';
-                slideCenter = document.createElement('div');
-                slideCenter.className = 'slide';
-                slideRight = document.createElement('div');
-                slideRight.className = 'slide';
-
-                track.appendChild(slideLeft);
-                track.appendChild(slideCenter);
-                track.appendChild(slideRight);
-
-                // Ajustar para que solo se vea el slide central (transform -100%)
-                track.style.transform = 'translate3d(-100%, 0, 0)';
-                currentIndex = 0;
-
-                actualizarSlides();
-            }
-
-            function crearSlideConImagen(url) {
-                var div = document.createElement('div');
-                div.className = 'slide';
-                var img = document.createElement('img');
-                img.src = url;
-                img.alt = 'Producto artesanal';
-                img.draggable = false;
-                div.appendChild(img);
-                return div;
-            }
-
-            function actualizarSlides() {
-                if (originalCount <= 1) return;
-
-                var prevIndex = (currentIndex - 1 + originalCount) % originalCount;
-                var nextIndex = (currentIndex + 1) % originalCount;
-
-                // Limpiar slides
-                slideLeft.innerHTML = '';
-                slideCenter.innerHTML = '';
-                slideRight.innerHTML = '';
-
-                // Insertar imágenes
-                var imgPrev = document.createElement('img');
-                imgPrev.src = originalImages[prevIndex];
-                imgPrev.alt = '';
-                imgPrev.draggable = false;
-                slideLeft.appendChild(imgPrev);
-
-                var imgCurr = document.createElement('img');
-                imgCurr.src = originalImages[currentIndex];
-                imgCurr.alt = '';
-                imgCurr.draggable = false;
-                slideCenter.appendChild(imgCurr);
-
-                var imgNext = document.createElement('img');
-                imgNext.src = originalImages[nextIndex];
-                imgNext.alt = '';
-                imgNext.draggable = false;
-                slideRight.appendChild(imgNext);
-
-                // Asegurar que la pista esté centrada en slideCenter
-                track.style.transition = 'none';
-                track.style.transform = 'translate3d(-100%, 0, 0)';
-            }
-
-            function moverSlide(direccion) {
-                if (isTransitioning || originalCount <= 1) return;
-
-                isTransitioning = true;
-
-                // Actualizar índice
-                if (direccion === 'next') {
-                    currentIndex = (currentIndex + 1) % originalCount;
-                } else {
-                    currentIndex = (currentIndex - 1 + originalCount) % originalCount;
-                }
-
-                // Aplicar transición para mover la pista
-                track.style.transition = 'transform ' + (TRANSITION_DURATION / 1000) + 's ease-out';
-                if (direccion === 'next') {
-                    track.style.transform = 'translate3d(-200%, 0, 0)';
-                } else {
-                    track.style.transform = 'translate3d(0, 0, 0)';
-                }
-
-                // Al terminar la transición, reubicar y actualizar slides
-                setTimeout(function() {
-                    track.style.transition = 'none';
-                    // Volver a centrar el track en -100% y actualizar contenido
-                    actualizarSlides();
-                    isTransitioning = false;
-                }, TRANSITION_DURATION);
-            }
-
-            function siguienteAuto() {
-                moverSlide('next');
-            }
-
-            function iniciarAutoAvance() {
-                clearInterval(autoTimer);
-                if (originalCount > 1) {
-                    autoTimer = setInterval(siguienteAuto, AUTOPLAY_INTERVAL);
-                }
-            }
-
-            // ---------- RELOJ ----------
+            // ---------- RELOJ DIGITAL EXACTO ----------
             function actualizarReloj() {
                 var ahora = new Date();
                 var h = ahora.getHours();
                 var m = ahora.getMinutes();
                 var s = ahora.getSeconds();
+
                 clockTimeEl.textContent =
                     (h < 10 ? '0' : '') + h + ':' +
                     (m < 10 ? '0' : '') + m + ':' +
@@ -352,16 +158,17 @@
                 var mes = MESES[ahora.getMonth()];
                 clockDateEl.textContent = dia + ', ' + ahora.getDate() + ' de ' + mes + ' de ' + ahora.getFullYear();
             }
+
             actualizarReloj();
             setInterval(actualizarReloj, 1000);
 
             // ---------- INICIO ----------
             cargarFondo();
-            cargarImagenes(function(imgs) {
-                construirGaleria(imgs);
-                if (originalCount > 1) {
-                    iniciarAutoAvance();
-                }
+
+            // Opcional: intentar reproducir el video por si el autoplay falla en algún TV muy restrictivo
+            var video = document.getElementById('promoVideo');
+            video.play().catch(function(err) {
+                // Si falla, no hacemos nada (es raro con muted)
             });
         })();
     </script>
