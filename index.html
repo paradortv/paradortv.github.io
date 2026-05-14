@@ -53,16 +53,13 @@
             user-select: none;
         }
 
-        /* Pista que contiene todas las diapositivas */
         .gallery-track {
             display: flex;
             height: 100%;
-            /* Transición más fluida y hermosa */
             transition: transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1.0);
             will-change: transform;
         }
 
-        /* Cada diapositiva ocupa el 100% del ancho del contenedor */
         .slide {
             flex: 0 0 100%;
             height: 100%;
@@ -79,19 +76,40 @@
             pointer-events: none;
             border-radius: 8px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
-            /* Pequeña transición para suavizar cambios de escala u opacidad si los hubiera */
             transition: transform 0.3s ease, opacity 0.3s ease;
         }
 
-        .footer-text {
+        /* Contenedor del reloj */
+        .clock-container {
             flex-shrink: 0;
             text-align: center;
-            padding: 2vh 0;
-            color: white;
-            font-size: clamp(2.5rem, 5vw, 5rem);
+            padding: 2vh 0 1vh;
+            color: #f5e6d3;               /* Tono cálido pergamino */
+            font-family: 'Georgia', 'Times New Roman', serif;  /* Rústico con remates */
+            text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.7), 0 0 15px rgba(200, 150, 80, 0.5);
+            letter-spacing: 2px;
+        }
+
+        /* Hora principal grande */
+        .clock-time {
+            font-size: clamp(3rem, 6vw, 5rem);
             font-weight: bold;
-            text-shadow: 2px 2px 6px rgba(0, 0, 0, 0.7);
-            letter-spacing: 1px;
+            line-height: 1.1;
+            margin-bottom: 5px;
+        }
+
+        /* Fecha secundaria un poco más pequeña */
+        .clock-date {
+            font-size: clamp(1.5rem, 3vw, 2.5rem);
+            font-weight: normal;
+            opacity: 0.9;
+            text-transform: capitalize;
+        }
+
+        /* Segundos con estilo ligeramente diferente */
+        .clock-seconds {
+            font-size: 0.7em;
+            opacity: 0.8;
         }
     </style>
 </head>
@@ -101,7 +119,12 @@
             <div class="gallery-container" id="galleryContainer">
                 <div class="gallery-track" id="galleryTrack"></div>
             </div>
-            <div class="footer-text">¡mira nuestros productos!</div>
+
+            <!-- Aquí va el reloj -->
+            <div class="clock-container" id="clockContainer">
+                <div class="clock-time" id="clockTime">--:--:--</div>
+                <div class="clock-date" id="clockDate">Cargando fecha...</div>
+            </div>
         </div>
     </div>
 
@@ -110,11 +133,15 @@
             // ---------- CONFIGURACIÓN ----------
             var MAX_IMAGES = 20;
             var AUTOPLAY_INTERVAL = 5000;
-            var TRANSITION_DURATION = 600;     // Debe coincidir con CSS (0.6s = 600ms)
+            var TRANSITION_DURATION = 600;
 
             var track = document.getElementById('galleryTrack');
             var container = document.getElementById('galleryContainer');
             var body = document.body;
+
+            // Elementos del reloj
+            var clockTimeEl = document.getElementById('clockTime');
+            var clockDateEl = document.getElementById('clockDate');
 
             var originalImages = [];
             var originalCount = 0;
@@ -127,7 +154,11 @@
             var startOffset = 0;
             var lastMoveX;
 
-            // ---------- CARGA DEL FONDO POR JS ----------
+            // ---------- NOMBRES EN ESPAÑOL (compatibles con cualquier navegador) ----------
+            var DIAS_SEMANA = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+            var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+
+            // ---------- CARGA DEL FONDO ----------
             function loadBackground() {
                 var bgImg = new Image();
                 bgImg.onload = function() {
@@ -195,7 +226,6 @@
                 var fragment = document.createDocumentFragment();
 
                 if (originalCount > 1) {
-                    // Clon del último al principio
                     fragment.appendChild(createSlide(images[originalCount - 1]));
                 }
 
@@ -204,7 +234,6 @@
                 }
 
                 if (originalCount > 1) {
-                    // Clon de la primera al final
                     fragment.appendChild(createSlide(images[0]));
                 }
 
@@ -251,6 +280,35 @@
             function getCurrentOffset() {
                 return -currentIndex * container.offsetWidth;
             }
+
+            // ---------- RELOJ DIGITAL ----------
+            function updateClock() {
+                var ahora = new Date();
+
+                // Hora con dos dígitos
+                var horas = ahora.getHours();
+                var minutos = ahora.getMinutes();
+                var segundos = ahora.getSeconds();
+
+                var strHoras = (horas < 10 ? '0' : '') + horas;
+                var strMinutos = (minutos < 10 ? '0' : '') + minutos;
+                var strSegundos = (segundos < 10 ? '0' : '') + segundos;
+
+                // Mostrar hora: HH:MM:SS
+                clockTimeEl.innerHTML = strHoras + ':' + strMinutos + ':' + strSegundos;
+
+                // Fecha
+                var diaSemana = DIAS_SEMANA[ahora.getDay()];
+                var diaMes = ahora.getDate();
+                var mes = MESES[ahora.getMonth()];
+                var anio = ahora.getFullYear();
+
+                clockDateEl.textContent = diaSemana + ', ' + diaMes + ' de ' + mes + ' de ' + anio;
+            }
+
+            // Actualizar el reloj inmediatamente y luego cada segundo
+            updateClock();
+            setInterval(updateClock, 1000);
 
             // ---------- EVENTOS DE RATÓN ----------
             container.addEventListener('mousedown', function(e) {
