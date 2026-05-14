@@ -47,18 +47,17 @@
             min-height: 0;
             overflow: hidden;
             position: relative;
-            border-radius: 12px;
-            background-color: rgba(0, 0, 0, 0.4);
-            box-shadow:
-                0 0 0 3px rgba(180, 140, 100, 0.3),
-                0 20px 40px rgba(0, 0, 0, 0.6),
-                inset 0 0 30px rgba(0, 0, 0, 0.5);
+            border-radius: 8px;
+            background-color: rgba(0, 0, 0, 0.5);
+            /* Sombra sutil sin impacto */
+            box-shadow: 0 0 2px rgba(180, 140, 100, 0.3);
         }
 
         .gallery-track {
             display: flex;
             height: 100%;
-            transition: transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1.0);
+            /* Transición rápida y suave con aceleración hardware */
+            transition: transform 0.4s ease-out;
             will-change: transform;
         }
 
@@ -68,7 +67,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 0;
+            padding: 5px;
             background-color: #1a1a1a;
         }
 
@@ -76,9 +75,7 @@
             max-width: 100%;
             max-height: 100%;
             object-fit: contain;
-            border-radius: 6px;
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
-            pointer-events: none;
+            /* Sin sombras ni bordes redondeados para evitar repintados */
         }
 
         .clock-container {
@@ -87,8 +84,8 @@
             padding: 1vh 0 0.5vh;
             color: #eed9b2;
             text-shadow:
-                2px 2px 6px rgba(0, 0, 0, 0.7),
-                0 0 15px rgba(180, 130, 70, 0.6);
+                1px 1px 3px rgba(0,0,0,0.7),
+                0 0 10px rgba(180, 130, 70, 0.5);
             letter-spacing: 2px;
         }
 
@@ -124,7 +121,9 @@
     <div class="overlay">
         <div class="main-container">
             <div class="gallery-container" id="galleryContainer">
-                <div class="gallery-track" id="galleryTrack"></div>
+                <div class="gallery-track" id="galleryTrack">
+                    <!-- Solo 3 slides se generan dinámicamente -->
+                </div>
             </div>
 
             <div class="clock-container" id="clockContainer">
@@ -137,23 +136,25 @@
 
     <script>
         (function() {
-            var MAX_IMAGES = 20;                // Número máximo de imágenes que buscará
-            var AUTOPLAY_INTERVAL = 5000;       // 5 segundos entre cada cambio
-            var TRANSITION_DURATION = 600;      // Debe coincidir con CSS (0.6s)
+            var MAX_IMAGES = 20;
+            var AUTOPLAY_INTERVAL = 5000;       // 5 segundos
+            var TRANSITION_DURATION = 400;      // ms, debe coincidir con CSS (0.4s)
 
             var track = document.getElementById('galleryTrack');
+            var container = document.getElementById('galleryContainer');
             var body = document.body;
             var clockTimeEl = document.getElementById('clockTime');
             var clockDateEl = document.getElementById('clockDate');
 
-            var originalImages = [];            // URLs de imágenes válidas
+            var originalImages = [];            // URLs válidas
             var originalCount = 0;
-            var slides = [];                    // Array de elementos slide (incluye clones)
-            var currentIndex = 0;               // Índice actual en el array extendido
+            var currentIndex = 0;               // Índice de la imagen activa (0..originalCount-1)
             var autoTimer = null;
             var isTransitioning = false;
 
-            // Nombres en español para el reloj
+            // Referencias a los 3 slides fijos
+            var slideLeft, slideCenter, slideRight;
+
             var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
             var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 
@@ -161,13 +162,12 @@
             function cargarFondo() {
                 var img = new Image();
                 img.onload = function() {
-                    body.style.backgroundImage = "url('recursos/fondo.jpeg')";
+                    body.style.backgroundImage = "url('recursos/fondo.jpeg?v=" + Date.now() + "')";
                 };
                 img.onerror = function() {
-                    body.style.backgroundColor = '#1f1a15';   // Respaldo
+                    body.style.backgroundColor = '#1f1a15';
                 };
-                // Añadimos un parámetro para evitar caché en TV
-                img.src = 'recursos/fondo.jpeg?v=' + new Date().getTime();
+                img.src = 'recursos/fondo.jpeg?v=' + Date.now();
             }
 
             // ---------- CARGA DE IMÁGENES CON REINTENTOS ----------
@@ -175,51 +175,40 @@
                 var validas = [];
                 var pendientes = MAX_IMAGES;
 
-                function verificar(indice, intentosRestantes) {
+                function verificar(indice, intentos) {
                     if (indice > pendientes) {
                         callback(validas);
                         return;
                     }
 
-                    // Parámetro único anti-caché (timestamp)
-                    var url = 'img/' + indice + '.jpeg?v=' + new Date().getTime();
+                    var url = 'img/' + indice + '.jpeg?v=' + Date.now();
                     var img = new Image();
                     img.onload = function() {
                         validas.push(url);
-                        verificar(indice + 1, 2);  // Siguiente con 2 intentos
+                        verificar(indice + 1, 2);
                     };
                     img.onerror = function() {
-                        if (intentosRestantes > 1) {
-                            // Reintentar con otro timestamp
+                        if (intentos > 1) {
                             setTimeout(function() {
-                                verificar(indice, intentosRestantes - 1);
-                            }, 500);
+                                verificar(indice, intentos - 1);
+                            }, 800);
                         } else {
-                            // No se pudo cargar tras reintentos: la omitimos
+                            // Omitir imagen que no existe
                             verificar(indice + 1, 2);
                         }
                     };
                     img.src = url;
                 }
 
-                verificar(1, 2);  // Comienza con 2 intentos por imagen
+                verificar(1, 2);
             }
 
-            function crearSlide(urlImagen) {
-                var div = document.createElement('div');
-                div.className = 'slide';
-                var img = document.createElement('img');
-                img.src = urlImagen;
-                img.alt = 'Producto artesanal';
-                img.draggable = false;
-                div.appendChild(img);
-                return div;
-            }
-
+            // ---------- CONSTRUCCIÓN DE LA GALERÍA (3 slides dinámicos) ----------
             function construirGaleria(imagenes) {
-                track.innerHTML = '';
                 originalImages = imagenes;
                 originalCount = imagenes.length;
+
+                track.innerHTML = '';
 
                 if (originalCount === 0) {
                     var slide = document.createElement('div');
@@ -227,41 +216,118 @@
                     slide.style.color = '#eed9b2';
                     slide.style.fontSize = '2.5rem';
                     slide.textContent = 'Próximamente...';
+                    slide.style.flex = '0 0 100%';
                     track.appendChild(slide);
-                    slides = [slide];
+                    slideLeft = slideCenter = slideRight = slide;
                     currentIndex = 0;
                     return;
                 }
 
-                var fragment = document.createDocumentFragment();
-
-                if (originalCount > 1) {
-                    // Clon del último al principio (para bucle infinito)
-                    fragment.appendChild(crearSlide(imagenes[originalCount - 1]));
+                if (originalCount === 1) {
+                    var unicaSlide = crearSlideConImagen(imagenes[0]);
+                    unicaSlide.style.flex = '0 0 100%';
+                    track.appendChild(unicaSlide);
+                    slideLeft = slideCenter = slideRight = unicaSlide;
+                    currentIndex = 0;
+                    return;
                 }
 
-                for (var i = 0; i < originalCount; i++) {
-                    fragment.appendChild(crearSlide(imagenes[i]));
-                }
+                // Crear los 3 slides fijos
+                slideLeft = document.createElement('div');
+                slideLeft.className = 'slide';
+                slideCenter = document.createElement('div');
+                slideCenter.className = 'slide';
+                slideRight = document.createElement('div');
+                slideRight.className = 'slide';
 
-                if (originalCount > 1) {
-                    // Clon del primero al final
-                    fragment.appendChild(crearSlide(imagenes[0]));
-                }
+                track.appendChild(slideLeft);
+                track.appendChild(slideCenter);
+                track.appendChild(slideRight);
 
-                track.appendChild(fragment);
-                slides = Array.prototype.slice.call(track.children);
-                // Posicionamos en el primer slide real (índice 1 si hay clones)
-                currentIndex = originalCount > 1 ? 1 : 0;
-                actualizarTransform(false);
+                // Ajustar para que solo se vea el slide central (transform -100%)
+                track.style.transform = 'translate3d(-100%, 0, 0)';
+                currentIndex = 0;
+
+                actualizarSlides();
             }
 
-            function actualizarTransform(conTransicion) {
-                if (conTransicion === undefined) conTransicion = true;
-                track.style.transition = conTransicion ?
-                    'transform ' + (TRANSITION_DURATION / 1000) + 's cubic-bezier(0.25, 0.1, 0.25, 1.0)' :
-                    'none';
-                track.style.transform = 'translateX(-' + (currentIndex * 100) + '%)';
+            function crearSlideConImagen(url) {
+                var div = document.createElement('div');
+                div.className = 'slide';
+                var img = document.createElement('img');
+                img.src = url;
+                img.alt = 'Producto artesanal';
+                img.draggable = false;
+                div.appendChild(img);
+                return div;
+            }
+
+            function actualizarSlides() {
+                if (originalCount <= 1) return;
+
+                var prevIndex = (currentIndex - 1 + originalCount) % originalCount;
+                var nextIndex = (currentIndex + 1) % originalCount;
+
+                // Limpiar slides
+                slideLeft.innerHTML = '';
+                slideCenter.innerHTML = '';
+                slideRight.innerHTML = '';
+
+                // Insertar imágenes
+                var imgPrev = document.createElement('img');
+                imgPrev.src = originalImages[prevIndex];
+                imgPrev.alt = '';
+                imgPrev.draggable = false;
+                slideLeft.appendChild(imgPrev);
+
+                var imgCurr = document.createElement('img');
+                imgCurr.src = originalImages[currentIndex];
+                imgCurr.alt = '';
+                imgCurr.draggable = false;
+                slideCenter.appendChild(imgCurr);
+
+                var imgNext = document.createElement('img');
+                imgNext.src = originalImages[nextIndex];
+                imgNext.alt = '';
+                imgNext.draggable = false;
+                slideRight.appendChild(imgNext);
+
+                // Asegurar que la pista esté centrada en slideCenter
+                track.style.transition = 'none';
+                track.style.transform = 'translate3d(-100%, 0, 0)';
+            }
+
+            function moverSlide(direccion) {
+                if (isTransitioning || originalCount <= 1) return;
+
+                isTransitioning = true;
+
+                // Actualizar índice
+                if (direccion === 'next') {
+                    currentIndex = (currentIndex + 1) % originalCount;
+                } else {
+                    currentIndex = (currentIndex - 1 + originalCount) % originalCount;
+                }
+
+                // Aplicar transición para mover la pista
+                track.style.transition = 'transform ' + (TRANSITION_DURATION / 1000) + 's ease-out';
+                if (direccion === 'next') {
+                    track.style.transform = 'translate3d(-200%, 0, 0)';
+                } else {
+                    track.style.transform = 'translate3d(0, 0, 0)';
+                }
+
+                // Al terminar la transición, reubicar y actualizar slides
+                setTimeout(function() {
+                    track.style.transition = 'none';
+                    // Volver a centrar el track en -100% y actualizar contenido
+                    actualizarSlides();
+                    isTransitioning = false;
+                }, TRANSITION_DURATION);
+            }
+
+            function siguienteAuto() {
+                moverSlide('next');
             }
 
             function iniciarAutoAvance() {
@@ -271,29 +337,7 @@
                 }
             }
 
-            function siguienteAuto() {
-                if (isTransitioning || originalCount <= 1) return;
-                isTransitioning = true;
-                currentIndex++;
-                actualizarTransform(true);
-                setTimeout(manejarFinTransicion, TRANSITION_DURATION + 50);
-            }
-
-            function manejarFinTransicion() {
-                isTransitioning = false;
-                if (originalCount <= 1) return;
-
-                // Si estamos en un clon, saltamos a la posición real sin animación
-                if (currentIndex === 0) {
-                    currentIndex = originalCount;
-                    actualizarTransform(false);
-                } else if (currentIndex === slides.length - 1) {
-                    currentIndex = 1;
-                    actualizarTransform(false);
-                }
-            }
-
-            // ---------- RELOJ DIGITAL ----------
+            // ---------- RELOJ ----------
             function actualizarReloj() {
                 var ahora = new Date();
                 var h = ahora.getHours();
@@ -304,11 +348,9 @@
                     (m < 10 ? '0' : '') + m + ':' +
                     (s < 10 ? '0' : '') + s;
 
-                var diaSemana = DIAS[ahora.getDay()];
-                var diaMes = ahora.getDate();
+                var dia = DIAS[ahora.getDay()];
                 var mes = MESES[ahora.getMonth()];
-                var anio = ahora.getFullYear();
-                clockDateEl.textContent = diaSemana + ', ' + diaMes + ' de ' + mes + ' de ' + anio;
+                clockDateEl.textContent = dia + ', ' + ahora.getDate() + ' de ' + mes + ' de ' + ahora.getFullYear();
             }
             actualizarReloj();
             setInterval(actualizarReloj, 1000);
