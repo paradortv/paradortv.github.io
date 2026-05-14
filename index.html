@@ -31,7 +31,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 2.5vw;               /* Más espacio para la galería */
+            padding: 2vw;               /* Márgenes reducidos */
         }
 
         .main-container {
@@ -42,9 +42,9 @@
             height: 100%;
         }
 
-        /* Galería con marco rústico */
+        /* Galería */
         .gallery-container {
-            flex: 1;                      /* Ocupa todo el espacio disponible */
+            flex: 1 1 auto;             /* Ocupa todo el espacio disponible */
             min-height: 0;
             overflow: hidden;
             touch-action: none;
@@ -71,18 +71,24 @@
             display: flex;
             justify-content: center;
             align-items: center;
-            padding: 1.5%;               /* Menos padding, más espacio para la imagen */
+            padding: 0;                 /* Sin padding para aprovechar todo el espacio */
             background-color: #1a1a1a;
-            background-size: contain;
-            background-position: center;
-            background-repeat: no-repeat;
         }
 
-        /* Contenedor del reloj compacto */
+        .slide img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;        /* La imagen se muestra completa */
+            border-radius: 6px;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+        }
+
+        /* Reloj compacto */
         .clock-container {
             flex-shrink: 0;
             text-align: center;
-            padding: 1.5vh 0 0.5vh;      /* Menos padding vertical */
+            padding: 1vh 0 0.5vh;
             color: #eed9b2;
             text-shadow:
                 2px 2px 6px rgba(0, 0, 0, 0.7),
@@ -95,15 +101,15 @@
             max-width: 400px;
             height: 2px;
             background: linear-gradient(to right, transparent, #b89470, transparent);
-            margin: 0 auto 1vh;          /* Margen inferior reducido */
+            margin: 0 auto 0.5vh;
             opacity: 0.7;
         }
 
         .clock-time {
             font-size: clamp(3rem, 6vw, 5rem);
             font-weight: bold;
-            line-height: 1.1;
-            margin-bottom: 3px;
+            line-height: 1;
+            margin-bottom: 2px;
         }
 
         .clock-date {
@@ -197,7 +203,11 @@
             function crearSlide(urlImagen) {
                 var div = document.createElement('div');
                 div.className = 'slide';
-                div.style.backgroundImage = "url('" + urlImagen + "')";
+                var img = document.createElement('img');
+                img.src = urlImagen;
+                img.alt = 'Producto artesanal';
+                img.draggable = false;
+                div.appendChild(img);
                 return div;
             }
 
@@ -209,7 +219,6 @@
                 if (originalCount === 0) {
                     var slide = document.createElement('div');
                     slide.className = 'slide';
-                    slide.style.backgroundImage = 'none';
                     slide.style.color = '#eed9b2';
                     slide.style.fontSize = '2.5rem';
                     slide.textContent = 'Próximamente...';
