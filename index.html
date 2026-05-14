@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Artesanías | Video</title>
+    <title>Galería artesanal</title>
     <style>
         * {
             margin: 0;
@@ -42,36 +42,40 @@
             height: 100%;
         }
 
-        .video-container {
+        .gallery-container {
             flex: 1 1 auto;
             min-height: 0;
-            border-radius: 8px;
-            background-color: #1a1a1a;
-            box-shadow: 0 0 2px rgba(180, 140, 100, 0.3);
             overflow: hidden;
             position: relative;
+            border-radius: 8px;
+            background-color: rgba(0, 0, 0, 0.5);
+            /* Sombra sutil sin impacto */
+            box-shadow: 0 0 2px rgba(180, 140, 100, 0.3);
         }
 
-        /* Imagen de respaldo (se muestra si el video no arranca) */
-        .fallback-image {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
+        .gallery-track {
+            display: flex;
             height: 100%;
-            object-fit: contain;
-            background: #1a1a1a;
-            display: block;               /* Visible por defecto */
-            z-index: 2;
+            /* Transición rápida y suave con aceleración hardware */
+            transition: transform 0.4s ease-out;
+            will-change: transform;
         }
 
-        .video-container video {
-            width: 100%;
+        .slide {
+            flex: 0 0 100%;
             height: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 5px;
+            background-color: #1a1a1a;
+        }
+
+        .slide img {
+            max-width: 100%;
+            max-height: 100%;
             object-fit: contain;
-            background: #1a1a1a;
-            position: relative;
-            z-index: 1;
+            /* Sin sombras ni bordes redondeados para evitar repintados */
         }
 
         .clock-container {
@@ -116,17 +120,13 @@
 <body>
     <div class="overlay">
         <div class="main-container">
-            <div class="video-container" id="videoContainer">
-                <!-- Imagen estática de respaldo (prioritaria) -->
-                <img id="fallbackImg" class="fallback-image" src="img/poster.jpg" alt="Vista previa">
-                <!-- Video (oculto debajo del poster mientras no esté reproduciéndose) -->
-                <video id="promoVideo" autoplay loop muted playsinline preload="metadata"
-                       poster="img/poster.jpg">
-                    <source src="img/video.mp4" type="video/mp4">
-                </video>
+            <div class="gallery-container" id="galleryContainer">
+                <div class="gallery-track" id="galleryTrack">
+                    <!-- Solo 3 slides se generan dinámicamente -->
+                </div>
             </div>
 
-            <div class="clock-container">
+            <div class="clock-container" id="clockContainer">
                 <div class="clock-separator"></div>
                 <div class="clock-time" id="clockTime">--:--:--</div>
                 <div class="clock-date" id="clockDate">Cargando fecha...</div>
@@ -136,20 +136,27 @@
 
     <script>
         (function() {
+            var MAX_IMAGES = 20;
+            var AUTOPLAY_INTERVAL = 5000;       // 5 segundos
+            var TRANSITION_DURATION = 400;      // ms, debe coincidir con CSS (0.4s)
+
+            var track = document.getElementById('galleryTrack');
+            var container = document.getElementById('galleryContainer');
             var body = document.body;
             var clockTimeEl = document.getElementById('clockTime');
             var clockDateEl = document.getElementById('clockDate');
-            var video = document.getElementById('promoVideo');
-            var fallbackImg = document.getElementById('fallbackImg');
-            var videoContainer = document.getElementById('videoContainer');
+
+            var originalImages = [];            // URLs válidas
+            var originalCount = 0;
+            var currentIndex = 0;               // Índice de la imagen activa (0..originalCount-1)
+            var autoTimer = null;
+            var isTransitioning = false;
+
+            // Referencias a los 3 slides fijos
+            var slideLeft, slideCenter, slideRight;
 
             var DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
             var MESES = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-
-            // Estados
-            var videoLoaded = false;
-            var timeoutId = null;
-            var retryInterval = 30000; // Reintentar cada 30 segundos si falló
 
             // ---------- CARGA DEL FONDO ----------
             function cargarFondo() {
@@ -161,6 +168,173 @@
                     body.style.backgroundColor = '#1f1a15';
                 };
                 img.src = 'recursos/fondo.jpeg?v=' + Date.now();
+            }
+
+            // ---------- CARGA DE IMÁGENES CON REINTENTOS ----------
+            function cargarImagenes(callback) {
+                var validas = [];
+                var pendientes = MAX_IMAGES;
+
+                function verificar(indice, intentos) {
+                    if (indice > pendientes) {
+                        callback(validas);
+                        return;
+                    }
+
+                    var url = 'img/' + indice + '.jpeg?v=' + Date.now();
+                    var img = new Image();
+                    img.onload = function() {
+                        validas.push(url);
+                        verificar(indice + 1, 2);
+                    };
+                    img.onerror = function() {
+                        if (intentos > 1) {
+                            setTimeout(function() {
+                                verificar(indice, intentos - 1);
+                            }, 800);
+                        } else {
+                            // Omitir imagen que no existe
+                            verificar(indice + 1, 2);
+                        }
+                    };
+                    img.src = url;
+                }
+
+                verificar(1, 2);
+            }
+
+            // ---------- CONSTRUCCIÓN DE LA GALERÍA (3 slides dinámicos) ----------
+            function construirGaleria(imagenes) {
+                originalImages = imagenes;
+                originalCount = imagenes.length;
+
+                track.innerHTML = '';
+
+                if (originalCount === 0) {
+                    var slide = document.createElement('div');
+                    slide.className = 'slide';
+                    slide.style.color = '#eed9b2';
+                    slide.style.fontSize = '2.5rem';
+                    slide.textContent = 'Próximamente...';
+                    slide.style.flex = '0 0 100%';
+                    track.appendChild(slide);
+                    slideLeft = slideCenter = slideRight = slide;
+                    currentIndex = 0;
+                    return;
+                }
+
+                if (originalCount === 1) {
+                    var unicaSlide = crearSlideConImagen(imagenes[0]);
+                    unicaSlide.style.flex = '0 0 100%';
+                    track.appendChild(unicaSlide);
+                    slideLeft = slideCenter = slideRight = unicaSlide;
+                    currentIndex = 0;
+                    return;
+                }
+
+                // Crear los 3 slides fijos
+                slideLeft = document.createElement('div');
+                slideLeft.className = 'slide';
+                slideCenter = document.createElement('div');
+                slideCenter.className = 'slide';
+                slideRight = document.createElement('div');
+                slideRight.className = 'slide';
+
+                track.appendChild(slideLeft);
+                track.appendChild(slideCenter);
+                track.appendChild(slideRight);
+
+                // Ajustar para que solo se vea el slide central (transform -100%)
+                track.style.transform = 'translate3d(-100%, 0, 0)';
+                currentIndex = 0;
+
+                actualizarSlides();
+            }
+
+            function crearSlideConImagen(url) {
+                var div = document.createElement('div');
+                div.className = 'slide';
+                var img = document.createElement('img');
+                img.src = url;
+                img.alt = 'Producto artesanal';
+                img.draggable = false;
+                div.appendChild(img);
+                return div;
+            }
+
+            function actualizarSlides() {
+                if (originalCount <= 1) return;
+
+                var prevIndex = (currentIndex - 1 + originalCount) % originalCount;
+                var nextIndex = (currentIndex + 1) % originalCount;
+
+                // Limpiar slides
+                slideLeft.innerHTML = '';
+                slideCenter.innerHTML = '';
+                slideRight.innerHTML = '';
+
+                // Insertar imágenes
+                var imgPrev = document.createElement('img');
+                imgPrev.src = originalImages[prevIndex];
+                imgPrev.alt = '';
+                imgPrev.draggable = false;
+                slideLeft.appendChild(imgPrev);
+
+                var imgCurr = document.createElement('img');
+                imgCurr.src = originalImages[currentIndex];
+                imgCurr.alt = '';
+                imgCurr.draggable = false;
+                slideCenter.appendChild(imgCurr);
+
+                var imgNext = document.createElement('img');
+                imgNext.src = originalImages[nextIndex];
+                imgNext.alt = '';
+                imgNext.draggable = false;
+                slideRight.appendChild(imgNext);
+
+                // Asegurar que la pista esté centrada en slideCenter
+                track.style.transition = 'none';
+                track.style.transform = 'translate3d(-100%, 0, 0)';
+            }
+
+            function moverSlide(direccion) {
+                if (isTransitioning || originalCount <= 1) return;
+
+                isTransitioning = true;
+
+                // Actualizar índice
+                if (direccion === 'next') {
+                    currentIndex = (currentIndex + 1) % originalCount;
+                } else {
+                    currentIndex = (currentIndex - 1 + originalCount) % originalCount;
+                }
+
+                // Aplicar transición para mover la pista
+                track.style.transition = 'transform ' + (TRANSITION_DURATION / 1000) + 's ease-out';
+                if (direccion === 'next') {
+                    track.style.transform = 'translate3d(-200%, 0, 0)';
+                } else {
+                    track.style.transform = 'translate3d(0, 0, 0)';
+                }
+
+                // Al terminar la transición, reubicar y actualizar slides
+                setTimeout(function() {
+                    track.style.transition = 'none';
+                    // Volver a centrar el track en -100% y actualizar contenido
+                    actualizarSlides();
+                    isTransitioning = false;
+                }, TRANSITION_DURATION);
+            }
+
+            function siguienteAuto() {
+                moverSlide('next');
+            }
+
+            function iniciarAutoAvance() {
+                clearInterval(autoTimer);
+                if (originalCount > 1) {
+                    autoTimer = setInterval(siguienteAuto, AUTOPLAY_INTERVAL);
+                }
             }
 
             // ---------- RELOJ ----------
@@ -181,91 +355,14 @@
             actualizarReloj();
             setInterval(actualizarReloj, 1000);
 
-            // ---------- LÓGICA DEL VIDEO ----------
-            function mostrarPoster() {
-                fallbackImg.style.display = 'block';
-                video.style.display = 'none';      // Ocultamos el video para que no consuma recursos
-            }
-
-            function mostrarVideo() {
-                fallbackImg.style.display = 'none';
-                video.style.display = 'block';
-                videoLoaded = true;
-                if (timeoutId) clearTimeout(timeoutId);
-            }
-
-            function iniciarReproduccion() {
-                video.play().then(function() {
-                    // La reproducción comenzó
-                    mostrarVideo();
-                }).catch(function(err) {
-                    // Error al reproducir (probablemente por falta de datos)
-                    console.log('Reproducción fallida, esperando...');
-                    // Esperamos un poco y reintentamos
-                    setTimeout(function() {
-                        if (!videoLoaded) video.play();
-                    }, 1000);
-                });
-            }
-
-            function cargarVideo() {
-                // Reiniciar estado
-                videoLoaded = false;
-                video.currentTime = 0;
-                video.pause();
-                mostrarPoster();
-
-                // Timeout de seguridad: si en 6 segundos no se reproduce, se queda con el poster
-                timeoutId = setTimeout(function() {
-                    if (!videoLoaded) {
-                        console.log('Video no arrancó, mostrando fallback permanente');
-                        mostrarPoster();
-                        // Programar reintento en 30s
-                        setTimeout(cargarVideo, retryInterval);
-                    }
-                }, 6000);
-
-                // Forzar carga del video con fetch para evitar problemas de caché
-                var url = 'img/video.mp4?v=' + Date.now();
-                fetch(url, { mode: 'cors' })  // Intentamos con fetch; si falla (archivo local), el video src hará lo suyo
-                    .then(function(response) {
-                        if (response.ok) {
-                            // Asignamos blob al video para un control más fino
-                            return response.blob();
-                        }
-                        throw new Error('No se pudo descargar');
-                    })
-                    .then(function(blob) {
-                        var blobUrl = URL.createObjectURL(blob);
-                        video.src = blobUrl;
-                        video.load();
-                        iniciarReproduccion();
-                    })
-                    .catch(function() {
-                        // Si fetch falla (muy probable en local), usamos la carga normal
-                        console.log('Fetch no disponible, carga normal');
-                        video.src = 'img/video.mp4?v=' + Date.now();
-                        video.load();
-                        iniciarReproduccion();
-                    });
-            }
-
-            // Eventos nativos del video (por si fetch no se usó)
-            video.addEventListener('playing', function() {
-                mostrarVideo();
-            });
-            video.addEventListener('error', function() {
-                if (!videoLoaded) {
-                    clearTimeout(timeoutId);
-                    mostrarPoster();
-                    // Reintentar en 30 segundos
-                    setTimeout(cargarVideo, retryInterval);
+            // ---------- INICIO ----------
+            cargarFondo();
+            cargarImagenes(function(imgs) {
+                construirGaleria(imgs);
+                if (originalCount > 1) {
+                    iniciarAutoAvance();
                 }
             });
-
-            // Iniciar la primera carga
-            cargarFondo();
-            cargarVideo();
         })();
     </script>
 </body>
