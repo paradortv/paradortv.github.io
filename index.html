@@ -140,7 +140,6 @@
         (function() {
             // Configuración
             var MAX_IMAGES = 20;                // Máximo de imágenes a buscar
-            var AUTOPLAY_INTERVAL = 5000;       // 5 segundos entre cambios
             var TRANSITION_DURATION = 400;      // Duración de la transición (ms)
 
             // Elementos del DOM
@@ -153,7 +152,7 @@
             var originalImages = [];            // URLs válidas
             var originalCount = 0;
             var currentIndex = 0;               // Índice de la imagen activa (0..originalCount-1)
-            var autoTimer = null;
+            var autoTimer = null;               // Ahora guarda un setTimeout, no un setInterval
             var isTransitioning = false;
 
             // Los 3 slides fijos (izquierda, centro, derecha)
@@ -260,6 +259,9 @@
                 track.style.transform = 'translate3d(-100%, 0, 0)';
                 currentIndex = 0;
                 actualizarSlides();
+
+                // Iniciar el avance automático con el tiempo especial para la primera imagen
+                programarSiguienteAvance();
             }
 
             function crearSlideConImagen(url) {
@@ -314,6 +316,12 @@
                 if (isTransitioning || originalCount <= 1) return;
                 isTransitioning = true;
 
+                // Cancelar cualquier temporizador pendiente (se reprogramará después)
+                if (autoTimer) {
+                    clearTimeout(autoTimer);
+                    autoTimer = null;
+                }
+
                 if (direccion === 'next') {
                     currentIndex = (currentIndex + 1) % originalCount;
                     track.style.transition = 'transform ' + (TRANSITION_DURATION / 1000) + 's ease-out';
@@ -324,21 +332,34 @@
                     track.style.transform = 'translate3d(0, 0, 0)';
                 }
 
-                // Al terminar la transición, recolocamos y actualizamos los slides
+                // Al terminar la transición, recolocamos y programamos el siguiente avance
                 setTimeout(function() {
                     track.style.transition = 'none';
                     actualizarSlides();
                     isTransitioning = false;
+
+                    // Programar el siguiente movimiento con el tiempo correspondiente
+                    programarSiguienteAvance();
                 }, TRANSITION_DURATION);
             }
 
-            function iniciarAutoAvance() {
-                clearInterval(autoTimer);
-                if (originalCount > 1) {
-                    autoTimer = setInterval(function() {
-                        moverSlide('next');
-                    }, AUTOPLAY_INTERVAL);
+            // ---------- NUEVO SISTEMA DE AUTOAVANCE CON TIEMPOS DIFERENCIADOS ----------
+            function programarSiguienteAvance() {
+                // Limpiar cualquier temporizador pendiente
+                if (autoTimer) {
+                    clearTimeout(autoTimer);
+                    autoTimer = null;
                 }
+
+                // Si solo hay una imagen o ninguna, no se mueve
+                if (originalCount <= 1) return;
+
+                // La primera imagen se muestra 10 segundos, el resto 2 segundos
+                var delay = (currentIndex === 0) ? 10000 : 2000;
+
+                autoTimer = setTimeout(function() {
+                    moverSlide('next');
+                }, delay);
             }
 
             // ---------- RELOJ DIGITAL EXACTO ----------
@@ -363,9 +384,6 @@
             cargarFondo();
             cargarImagenes(function(imgs) {
                 construirGaleria(imgs);
-                if (originalCount > 1) {
-                    iniciarAutoAvance();
-                }
             });
         })();
     </script>
